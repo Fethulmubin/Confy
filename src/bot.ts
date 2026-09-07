@@ -1,8 +1,25 @@
 import { Telegraf, Markup } from "telegraf";
 import * as dotenv from "dotenv";
 import { userData, userStep } from "./state";
+import express from "express";
+
 
 dotenv.config();
+
+// Create an Express server to keep the bot alive
+const app = express();
+
+app.get("/", (_, res) => {
+  res.send("Bot is alive");
+});
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on ${PORT}`);
+});
+
+// Initialize the bot
 
 const bot = new Telegraf(process.env.BOT_TOKEN!);
 
