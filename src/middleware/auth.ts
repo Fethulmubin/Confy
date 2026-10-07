@@ -20,7 +20,26 @@ export async function authenticateUser(ctx: Context): Promise<User | null> {
   registerKnownUser(telegramId, rawName, username);
 
   try {
-    const user = await db.getUser(telegramId);
+    let user = await db.getUser(telegramId);
+
+    // If not found by ID, check if manager pre-registered them by @username
+    if (!user && username) {
+      const preRegistered = await db.getUserByUsername(username);
+      if (preRegistered) {
+        try {
+          user = await db.updateUserTelegramId(
+            preRegistered.telegram_id,
+            telegramId,
+            rawName,
+            username
+          );
+          console.log(`🔗 Successfully linked @${username} to Telegram ID ${telegramId} with role ${user.role}`);
+        } catch (linkErr: any) {
+          console.warn('[Auth] Could not link placeholder ID:', linkErr.message);
+        }
+      }
+    }
+
     if (!user) {
       const usernameText = username ? `@${username}` : 'No username set';
       const deniedMessage =
@@ -114,7 +133,22 @@ export async function checkCallbackRole(
   }
 
   try {
-    const user = await db.getUser(telegramId);
+    let user = await db.getUser(telegramId);
+    if (!user && ctx.from?.username) {
+      const preRegistered = await db.getUserByUsername(ctx.from.username);
+      if (preRegistered) {
+        try {
+          const rawName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || 'User';
+          user = await db.updateUserTelegramId(
+            preRegistered.telegram_id,
+            telegramId,
+            rawName,
+            ctx.from.username
+          );
+        } catch {}
+      }
+    }
+
     if (!user) {
       await ctx.answerCbQuery(
         `Access denied: Your Telegram ID is ${telegramId}. You are not registered.`,

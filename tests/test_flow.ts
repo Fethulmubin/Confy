@@ -108,4 +108,18 @@ assert(canActAsFinance('finance') === true, 'Finance can act as finance');
 assert(canActAsFinance('sales') === false, 'Sales cannot act as finance');
 console.log('✅ Lifecycle & authorization logic tests passed.');
 
+// Test 4: Username pre-registration and deterministic ID generation
+console.log('Test 4: Username pre-registration ID generation');
+import { generatePlaceholderId } from '../src/handlers/manager';
+
+const id1 = generatePlaceholderId('dawit_t');
+const id2 = generatePlaceholderId('dawit_t');
+const id3 = generatePlaceholderId('fethulm');
+
+assert(id1 === id2, 'Placeholder IDs for same username must be deterministic');
+assert(id1 < 0, 'Placeholder ID must be negative to avoid colliding with real Telegram IDs');
+assert(id3 < 0, 'Placeholder ID for fethulm must be negative');
+assert(id1 !== id3, 'Different usernames must produce distinct IDs');
+console.log(`✅ Deterministic placeholder ID tests passed (e.g. @dawit_t -> ${id1}).`);
+
 console.log('🎉 All unit and logic tests passed successfully!');

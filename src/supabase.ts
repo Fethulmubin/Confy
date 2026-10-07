@@ -179,6 +179,60 @@ export const db = {
   },
 
   /**
+   * Link or update a user's Telegram ID (e.g. from pre-registration placeholder)
+   */
+  async updateUserTelegramId(
+    oldId: number,
+    newId: number,
+    name: string,
+    username?: string | null
+  ): Promise<User> {
+    const supabase = getSupabase();
+    const cleanUsername = username ? username.replace(/^@/, '').trim() : null;
+
+    // Check if user already exists with newId
+    const existing = await this.getUser(newId);
+    if (existing) {
+      const oldUser = await this.getUser(oldId);
+      await this.deleteUser(oldId);
+      return this.upsertUser({
+        telegram_id: newId,
+        name: name || existing.name,
+        role: oldUser?.role || existing.role,
+        username: cleanUsername || existing.username,
+      });
+    }
+
+    const updatePayload: any = {
+      telegram_id: newId,
+      name,
+    };
+    if (cleanUsername) {
+      updatePayload.username = cleanUsername;
+    }
+
+    const { data, error } = await supabase
+      .from('users')
+      .update(updatePayload)
+      .eq('telegram_id', oldId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[DB Error] updateUserTelegramId:', error.message);
+      throw new Error(`Failed to update user Telegram ID: ${error.message}`);
+    }
+
+    return {
+      telegram_id: Number(data.telegram_id),
+      name: data.name,
+      role: data.role,
+      username: data.username || cleanUsername || null,
+      created_at: data.created_at,
+    };
+  },
+
+  /**
    * Create a new order
    */
   async createOrder(params: {

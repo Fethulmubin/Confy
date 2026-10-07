@@ -49,7 +49,7 @@ export function registerStartHandlers(bot: Telegraf): void {
         roleDescription =
           'You are registered as a *Finance Analyst*.\n' +
           '• Dispatched orders with payment slips arrive in the #Finance channel/topic.\n' +
-          '• Verify payments against bank records and [ Confirm Paid ] or [ Flag Discrepancy ].';
+          '• Verify payments against bank records and *Confirm Paid* or *Flag Discrepancy*.';
         break;
     }
 
@@ -93,7 +93,7 @@ export function registerStartHandlers(bot: Telegraf): void {
       helpText +=
         `*Manager Actions:*\n` +
         `• Monitor the #Orders topic for new requisitions\n` +
-        `• Tap [ Approve ] to release to the store or [ Reject ] to cancel\n` +
+        `• Tap *Approve* to release to the store or *Reject* to cancel\n` +
         `• /manage_team or tap '👥 Manage Team' to view staff, assign roles by @username, or revoke access\n`;
     } else if (user.role === 'store') {
       helpText +=
@@ -105,7 +105,7 @@ export function registerStartHandlers(bot: Telegraf): void {
       helpText +=
         `*Finance Actions:*\n` +
         `• Monitor the #Finance topic for payment slips\n` +
-        `• Audit bank transactions and tap [ Confirm Paid ] or [ Flag Discrepancy ]\n`;
+        `• Audit bank transactions and tap *Confirm Paid* or *Flag Discrepancy*\n`;
     }
 
     await ctx.reply(helpText, { parse_mode: 'Markdown' });
