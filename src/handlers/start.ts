@@ -11,7 +11,8 @@ export function registerStartHandlers(bot: Telegraf): void {
     clearSession(user.telegram_id);
 
     let roleDescription = '';
-    let extraMarkup: any = Markup.removeKeyboard();
+    let keyboardMarkup: any = Markup.removeKeyboard();
+    let inlineMarkup: any = undefined;
 
     switch (user.role) {
       case 'sales':
@@ -19,7 +20,7 @@ export function registerStartHandlers(bot: Telegraf): void {
           'You are registered as a *Sales Representative*.\n' +
           '• Use /new_order or tap the button below to create an order.\n' +
           '• Use /my_orders to track status and submit payment slips.';
-        extraMarkup = Markup.keyboard([
+        keyboardMarkup = Markup.keyboard([
           ['➕ New Order', '📋 My Orders'],
         ]).resize();
         break;
@@ -27,8 +28,14 @@ export function registerStartHandlers(bot: Telegraf): void {
       case 'manager':
         roleDescription =
           'You are registered as a *Manager*.\n' +
-          '• You will receive requisitions in the #Orders channel/topic.\n' +
-          '• You can [ Approve ] or [ Reject ] incoming requisitions.';
+          '• Authorize incoming requisitions in the #Orders channel/topic.\n' +
+          '• Tap the button below to open the *Team Management Dashboard* to add staff, change roles, or manage members.';
+        keyboardMarkup = Markup.keyboard([
+          ['👥 Manage Team'],
+        ]).resize();
+        inlineMarkup = Markup.inlineKeyboard([
+          [Markup.button.callback('👥 Open Team Management Dashboard', 'team_dashboard')],
+        ]);
         break;
 
       case 'store':
@@ -52,10 +59,18 @@ export function registerStartHandlers(bot: Telegraf): void {
       `${roleDescription}\n\n` +
       `Type /help at any time for guidance or /cancel to reset active actions.`;
 
-    await ctx.reply(greeting, {
-      parse_mode: 'Markdown',
-      ...extraMarkup,
-    });
+    if (inlineMarkup) {
+      await ctx.reply(greeting, {
+        parse_mode: 'Markdown',
+        ...keyboardMarkup,
+      });
+      await ctx.reply('👉 Manager Actions:', inlineMarkup);
+    } else {
+      await ctx.reply(greeting, {
+        parse_mode: 'Markdown',
+        ...keyboardMarkup,
+      });
+    }
   });
 
   // /help command
@@ -78,12 +93,13 @@ export function registerStartHandlers(bot: Telegraf): void {
       helpText +=
         `*Manager Actions:*\n` +
         `• Monitor the #Orders topic for new requisitions\n` +
-        `• Tap [ Approve ] to release to the store or [ Reject ] to cancel\n`;
+        `• Tap [ Approve ] to release to the store or [ Reject ] to cancel\n` +
+        `• /manage_team or tap '👥 Manage Team' to view staff, assign roles by @username, or revoke access\n`;
     } else if (user.role === 'store') {
       helpText +=
         `*Store Actions:*\n` +
         `• Monitor the #Store topic for approved releases\n` +
-        `• Reply directly to the release message with a signed receipt photo\n` +
+        `• Reply directly to release notices with a signed receipt photo\n` +
         `• The bot automatically delivers the receipt privately to the sales rep\n`;
     } else if (user.role === 'finance') {
       helpText +=

@@ -12,8 +12,12 @@ CREATE TABLE IF NOT EXISTS users (
     telegram_id BIGINT PRIMARY KEY,
     name TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('manager', 'store', 'finance', 'sales')),
+    username TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure username column exists if updating an existing table
+ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT;
 
 -- 2. Table: orders
 -- Stores orders through the complete requisition -> fulfillment -> reconciliation lifecycle.
@@ -36,6 +40,7 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE INDEX IF NOT EXISTS idx_orders_sales_id ON orders(sales_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 
 -- Trigger function to automatically maintain updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -65,16 +70,3 @@ CREATE POLICY "Bot full access to users" ON users FOR ALL USING (true) WITH CHEC
 
 DROP POLICY IF EXISTS "Bot full access to orders" ON orders;
 CREATE POLICY "Bot full access to orders" ON orders FOR ALL USING (true) WITH CHECK (true);
-
--- ============================================================================
--- Sample Seed Data (Replace telegram_id with actual Telegram User IDs)
--- To obtain your Telegram ID, run /start with the bot or message @userinfobot
--- ============================================================================
-/*
-INSERT INTO users (telegram_id, name, role) VALUES
-    (111111111, 'Dawit (Sales Rep)', 'sales'),
-    (222222222, 'Abebe (Manager)', 'manager'),
-    (333333333, 'Kebede (Storekeeper)', 'store'),
-    (444444444, 'Almaz (Finance Analyst)', 'finance')
-ON CONFLICT (telegram_id) DO NOTHING;
-*/

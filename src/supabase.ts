@@ -43,31 +43,83 @@ export const db = {
       telegram_id: Number(data.telegram_id),
       name: data.name,
       role: data.role,
+      username: data.username || null,
       created_at: data.created_at,
     };
   },
 
   /**
-   * Upsert a user (create or update their role/name)
+   * Fetch user by Telegram username
+   */
+  async getUserByUsername(username: string): Promise<User | null> {
+    const cleanUsername = username.replace(/^@/, '').trim().toLowerCase();
+    const supabase = getSupabase();
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .ilike('username', cleanUsername)
+        .maybeSingle();
+
+      if (error || !data) return null;
+
+      return {
+        telegram_id: Number(data.telegram_id),
+        name: data.name,
+        role: data.role,
+        username: data.username || null,
+        created_at: data.created_at,
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Upsert a user (create or update their role/name/username)
    */
   async upsertUser(params: {
     telegram_id: number;
     name: string;
     role: UserRole;
+    username?: string | null;
   }): Promise<User> {
     const supabase = getSupabase();
-    const { data, error } = await supabase
+    const cleanUsername = params.username ? params.username.replace(/^@/, '').trim() : null;
+
+    // Try upserting with username
+    let upsertPayload: any = {
+      telegram_id: params.telegram_id,
+      name: params.name,
+      role: params.role,
+    };
+    if (cleanUsername) {
+      upsertPayload.username = cleanUsername;
+    }
+
+    let { data, error } = await supabase
       .from('users')
-      .upsert(
-        {
-          telegram_id: params.telegram_id,
-          name: params.name,
-          role: params.role,
-        },
-        { onConflict: 'telegram_id' }
-      )
+      .upsert(upsertPayload, { onConflict: 'telegram_id' })
       .select()
       .single();
+
+    // If username column does not exist yet in Postgres, fallback gracefully
+    if (error && error.message.includes('username')) {
+      const fallback = await supabase
+        .from('users')
+        .upsert(
+          {
+            telegram_id: params.telegram_id,
+            name: params.name,
+            role: params.role,
+          },
+          { onConflict: 'telegram_id' }
+        )
+        .select()
+        .single();
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) {
       console.error('[DB Error] upsertUser:', error.message);
@@ -78,6 +130,7 @@ export const db = {
       telegram_id: Number(data.telegram_id),
       name: data.name,
       role: data.role,
+      username: data.username || cleanUsername || null,
       created_at: data.created_at,
     };
   },
@@ -102,6 +155,7 @@ export const db = {
       telegram_id: Number(row.telegram_id),
       name: row.name,
       role: row.role,
+      username: row.username || null,
       created_at: row.created_at,
     }));
   },

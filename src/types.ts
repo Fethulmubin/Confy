@@ -12,6 +12,7 @@ export interface User {
   telegram_id: number;
   name: string;
   role: UserRole;
+  username?: string | null;
   created_at?: string;
 }
 
@@ -35,6 +36,14 @@ export interface CreateOrderDraft {
   totalAmount?: number;
 }
 
+export interface AddUserDraft {
+  step: 'waiting_identity';
+  identifier?: string;
+  name?: string;
+  resolvedTelegramId?: number;
+}
+
 export type UserSession =
   | { type: 'create_order'; draft: CreateOrderDraft }
-  | { type: 'upload_slip'; orderId: number };
+  | { type: 'upload_slip'; orderId: number }
+  | { type: 'add_user'; draft: AddUserDraft };

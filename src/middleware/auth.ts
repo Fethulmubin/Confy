@@ -1,23 +1,35 @@
 import { Context } from 'telegraf';
 import { db } from '../supabase';
+import { config } from '../config';
 import { User, UserRole } from '../types';
+import { registerKnownUser } from '../state';
+import { escapeMarkdown } from '../utils';
 
 /**
  * Verifies that the sender is a registered user.
- * If unauthorized, responds with access denied showing their Telegram ID.
+ * If unauthorized, responds with access denied showing their Telegram ID and notifies the manager.
  */
 export async function authenticateUser(ctx: Context): Promise<User | null> {
   const telegramId = ctx.from?.id;
   if (!telegramId) return null;
 
+  const rawName = [ctx.from?.first_name, ctx.from?.last_name].filter(Boolean).join(' ') || 'User';
+  const username = ctx.from?.username;
+
+  // Cache user details for username lookups
+  registerKnownUser(telegramId, rawName, username);
+
   try {
     const user = await db.getUser(telegramId);
     if (!user) {
+      const usernameText = username ? `@${username}` : 'No username set';
       const deniedMessage =
         `⛔ *Access Denied*\n\n` +
-        `Your Telegram ID is: \`${telegramId}\`\n\n` +
+        `👤 *Name:* ${escapeMarkdown(rawName)}\n` +
+        `📱 *Username:* ${escapeMarkdown(usernameText)}\n` +
+        `🆔 *Telegram ID:* \`${telegramId}\`\n\n` +
         `You are not registered in the system. Self-selection of roles is not permitted.\n` +
-        `Please contact an administrator with your ID to request access.`;
+        `An access request has been sent to the Management team.`;
 
       if (ctx.callbackQuery) {
         await ctx.answerCbQuery(
@@ -26,9 +38,52 @@ export async function authenticateUser(ctx: Context): Promise<User | null> {
         );
       } else {
         await ctx.reply(deniedMessage, { parse_mode: 'Markdown' });
+
+        // Forward interactive access request to #Orders topic / Manager
+        if (config.ordersChatId) {
+          try {
+            await ctx.telegram.sendMessage(
+              config.ordersChatId,
+              `🔔 *New Access Request*\n\n` +
+              `👤 *Name:* ${escapeMarkdown(rawName)}\n` +
+              `📱 *Username:* ${username ? `@${escapeMarkdown(username)}` : 'None'}\n` +
+              `🆔 *Telegram ID:* \`${telegramId}\`\n\n` +
+              `Tap a button below to approve and assign role:`,
+              {
+                parse_mode: 'Markdown',
+                message_thread_id: config.ordersThreadId,
+                reply_markup: {
+                  inline_keyboard: [
+                    [
+                      { text: '💼 Sales', callback_data: `grant_role_${telegramId}_sales` },
+                      { text: '📦 Store', callback_data: `grant_role_${telegramId}_store` },
+                    ],
+                    [
+                      { text: '💳 Finance', callback_data: `grant_role_${telegramId}_finance` },
+                      { text: '👔 Manager', callback_data: `grant_role_${telegramId}_manager` },
+                    ],
+                  ],
+                },
+              }
+            );
+          } catch (notifyErr: any) {
+            console.warn('[Auth] Could not forward access request to manager:', notifyErr.message);
+          }
+        }
       }
       return null;
     }
+
+    // Keep stored username fresh in Supabase if changed
+    if (username && user.username !== username) {
+      db.upsertUser({
+        telegram_id: user.telegram_id,
+        name: user.name,
+        role: user.role,
+        username,
+      }).catch(() => {});
+    }
+
     return user;
   } catch (err: any) {
     console.error(`[Auth] Error authenticating user ${telegramId}:`, err.message);
