@@ -1,144 +1,109 @@
-import { Telegraf, Markup } from "telegraf";
-import * as dotenv from "dotenv";
-import { userData, userStep } from "./state";
-import express from "express";
+import { Telegraf } from 'telegraf';
+import express from 'express';
+import { config, validateConfig } from './config';
+import { db } from './supabase';
+import { registerStartHandlers } from './handlers/start';
+import { registerSalesHandlers } from './handlers/sales';
+import { registerManagerHandlers } from './handlers/manager';
+import { registerStoreHandlers } from './handlers/store';
+import { registerFinanceHandlers } from './handlers/finance';
 
+// 1. Validate configuration
+validateConfig();
 
-dotenv.config();
-
-// Create an Express server to keep the bot alive
+// 2. Create Express server for health checks & platform keep-alive
 const app = express();
 
-app.get("/", (_, res) => {
-  res.send("Bot is alive");
+app.get('/', (_, res) => {
+  res.json({
+    status: 'online',
+    service: 'Telegram Order Processing Bot',
+    uptime: process.uptime(),
+  });
 });
 
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log(`Server running on ${PORT}`);
+app.get('/health', (_, res) => {
+  res.status(200).send('OK');
 });
 
-// Initialize the bot
-
-const bot = new Telegraf(process.env.BOT_TOKEN!);
-
-const services = [
-  "Service 1",
-  "Service 2",
-  "Service 3",
-  "Service 4",
-];
-
-// start command 
-bot.start(async (ctx) => {
-  await ctx.reply(
-    "Welcome 👋\n\nPlease choose a service:",
-    Markup.keyboard(services.map((s) => [s]))
-      .oneTime()
-      .resize()
-  );
+const server = app.listen(config.port, () => {
+  console.log(`🚀 Express server running on port ${config.port}`);
 });
 
-// Handle service selection
+// 3. Initialize Telegraf bot
+const bot = new Telegraf(config.botToken);
 
-bot.hears(services, async (ctx) => {
-  const userId = ctx.from.id;
+// 4. Global error handling
+bot.catch((err: any, ctx) => {
+  console.error(`❌ [Telegraf Error] Update ${ctx.update.update_id}:`, err);
+  try {
+    if (ctx.callbackQuery) {
+      ctx.answerCbQuery('⚠️ An unexpected error occurred. Please try again.').catch(() => {});
+    } else {
+      ctx.reply('⚠️ An unexpected error occurred. Please try again.').catch(() => {});
+    }
+  } catch (replyErr) {
+    console.error('Failed to send error notification:', replyErr);
+  }
+});
 
-  userData.set(userId, {
-    service: ctx.message.text,
+// 5. Register modular handlers
+registerStartHandlers(bot);
+registerManagerHandlers(bot);
+registerStoreHandlers(bot);
+registerFinanceHandlers(bot);
+registerSalesHandlers(bot);
+
+// 6. Bootstrap Initial Manager if MANAGER_TELEGRAM_ID is configured in .env
+async function bootstrapManager(): Promise<void> {
+  if (config.managerTelegramId) {
+    try {
+      const existing = await db.getUser(config.managerTelegramId);
+      if (!existing) {
+        await db.upsertUser({
+          telegram_id: config.managerTelegramId,
+          name: 'Primary Manager',
+          role: 'manager',
+        });
+        console.log(`👑 Bootstrapped initial Manager Telegram ID: ${config.managerTelegramId}`);
+      } else if (existing.role !== 'manager') {
+        await db.upsertUser({
+          telegram_id: config.managerTelegramId,
+          name: existing.name,
+          role: 'manager',
+        });
+        console.log(`👑 Promoted Telegram ID ${config.managerTelegramId} to Manager.`);
+      }
+    } catch (err: any) {
+      console.warn(`[Bootstrap Manager] Note: Could not auto-bootstrap manager: ${err.message}`);
+    }
+  }
+}
+
+// 7. Launch bot
+bootstrapManager()
+  .then(() => bot.launch())
+  .then(() => {
+    console.log('🤖 Telegram Bot started and listening for events...');
+    console.log(`📍 Topic Routing:`);
+    console.log(`   #Orders  Chat: ${config.ordersChatId} (Thread: ${config.ordersThreadId ?? 'none'})`);
+    console.log(`   #Store   Chat: ${config.storeChatId} (Thread: ${config.storeThreadId ?? 'none'})`);
+    console.log(`   #Finance Chat: ${config.financeChatId} (Thread: ${config.financeThreadId ?? 'none'})`);
+  })
+  .catch((err) => {
+    console.error('Failed to launch Telegram bot:', err);
   });
 
-  userStep.set(userId, "waiting_name");
-
-  await ctx.reply("Please enter your full name:");
+// 8. Graceful shutdown
+process.once('SIGINT', () => {
+  console.log('Stopping bot on SIGINT...');
+  bot.stop('SIGINT');
+  server.close();
 });
 
-// Handle name input
-bot.on("text", async (ctx, next) => {
-  const userId = ctx.from.id;
-
-  if (userStep.get(userId) !== "waiting_name") {
-    return next();
-  }
-
-  const data = userData.get(userId)!;
-
-  data.name = ctx.message.text;
-
-  userData.set(userId, data);
-  userStep.set(userId, "waiting_phone");
-
-  await ctx.reply("Please enter your phone number:");
+process.once('SIGTERM', () => {
+  console.log('Stopping bot on SIGTERM...');
+  bot.stop('SIGTERM');
+  server.close();
 });
-
-// Handle phone number input
-bot.on("text", async (ctx, next) => {
-  const userId = ctx.from.id;
-
-  if (userStep.get(userId) !== "waiting_phone") {
-    return next();
-  }
-
-  const data = userData.get(userId)!;
-
-  data.phone = ctx.message.text;
-
-  userData.set(userId, data);
-  userStep.set(userId, "waiting_receipt");
-
-  await ctx.reply(`
-💳 Payment Instructions
-
-Bank: CBE
-Account: 1000000
-
-After payment, please upload your receipt.
-`);
-});
-
-
-// Handle receipt upload
-bot.on("photo", async (ctx) => {
-  const userId = ctx.from.id;
-
-  if (userStep.get(userId) !== "waiting_receipt") {
-    return;
-  }
-
-  const data = userData.get(userId);
-
-  const caption = `
-🔔 NEW REQUEST
-
-Service: ${data?.service}
-Name: ${data?.name}
-Phone: ${data?.phone}
-
-Telegram: @${ctx.from.username || "No Username"}
-`;
-
-  await ctx.telegram.sendMessage(
-    process.env.ADMIN_GROUP_ID!,
-    caption
-  );
-
-  const photo =
-    ctx.message.photo[ctx.message.photo.length - 1];
-
-  await ctx.telegram.sendPhoto(
-    process.env.ADMIN_GROUP_ID!,
-    photo.file_id
-  );
-
-  await ctx.reply(
-    "✅ Receipt received. Our team will review it."
-  );
-
-  userData.delete(userId);
-  userStep.delete(userId);
-});
-
-bot.launch();
-
 console.log("Bot started...");
