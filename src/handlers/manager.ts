@@ -6,6 +6,94 @@ import { escapeMarkdown, formatCurrency, formatTime } from '../utils';
 import { UserRole } from '../types';
 import { getSession, setSession, clearSession, getKnownUserByUsername, registerKnownUser } from '../state';
 
+/**
+ * Resolves a Telegram username or numeric ID into a valid user profile
+ * Uses Telegram getChat, Supabase database, and in-memory cache
+ */
+async function resolveUserIdentity(
+  bot: Telegraf,
+  input: string
+): Promise<{ id: number; username?: string; name: string } | null> {
+  const parts = input.trim().split(/\s+/);
+  const token = parts[0];
+  const customName = parts.length > 1 ? parts.slice(1).join(' ') : undefined;
+
+  // Case 1: Pure numeric Telegram ID
+  if (/^\d+$/.test(token)) {
+    const id = parseInt(token, 10);
+    const existing = await db.getUser(id).catch(() => null);
+    return {
+      id,
+      username: existing?.username || undefined,
+      name: customName || existing?.name || `Staff Member`,
+    };
+  }
+
+  // Case 2: Username string (@username or username)
+  const cleanUsername = token.replace(/^@/, '').toLowerCase();
+
+  // Step A: Query Telegram Bot API via getChat('@' + username)
+  try {
+    const chat: any = await bot.telegram.getChat('@' + cleanUsername);
+    if (chat && chat.id) {
+      const name =
+        customName ||
+        [chat.first_name, chat.last_name].filter(Boolean).join(' ') ||
+        chat.title ||
+        cleanUsername;
+      return {
+        id: chat.id,
+        username: chat.username || cleanUsername,
+        name,
+      };
+    }
+  } catch (err: any) {
+    console.log(`[Resolve] getChat(@${cleanUsername}) API check:`, err.message);
+  }
+
+  // Step B: Query Supabase database by username
+  try {
+    const dbUser = await db.getUserByUsername(cleanUsername);
+    if (dbUser) {
+      return {
+        id: dbUser.telegram_id,
+        username: dbUser.username || cleanUsername,
+        name: customName || dbUser.name,
+      };
+    }
+  } catch (err: any) {
+    console.log(`[Resolve] DB lookup failed:`, err.message);
+  }
+
+  // Step C: Check in-memory cache of interacted users
+  const cached = getKnownUserByUsername(cleanUsername);
+  if (cached) {
+    return {
+      id: cached.id,
+      username: cached.username || cleanUsername,
+      name: customName || cached.name,
+    };
+  }
+
+  // Case 3: Both username and ID provided in text, e.g. "@dawit 987654321" or "987654321 @dawit"
+  if (parts.length >= 2) {
+    const idPart = parts.find((p) => /^\d+$/.test(p));
+    const userPart = parts.find((p) => p.startsWith('@') || /^[a-zA-Z0-9_]{5,}$/.test(p));
+    if (idPart && userPart) {
+      const id = parseInt(idPart, 10);
+      const u = userPart.replace(/^@/, '');
+      const remainingName = parts.filter((p) => p !== idPart && p !== userPart).join(' ');
+      return {
+        id,
+        username: u,
+        name: customName || remainingName || u,
+      };
+    }
+  }
+
+  return null;
+}
+
 export function registerManagerHandlers(bot: Telegraf): void {
   // =========================================================================
   // Requisition Authorization (Phase 2)
@@ -155,9 +243,8 @@ export function registerManagerHandlers(bot: Telegraf): void {
     const assignedRole = ctx.match[2] as UserRole;
 
     try {
-      // Find known user info or fallback
       const existing = await db.getUser(targetId);
-      const name = existing?.name || `Employee ${targetId}`;
+      const name = existing?.name || `Staff Member`;
       const username = existing?.username || undefined;
 
       const saved = await db.upsertUser({
@@ -173,6 +260,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
         await ctx.editMessageText(
           `✅ *Access Request Approved*\n\n` +
           `👤 *Name:* ${escapeMarkdown(saved.name)}\n` +
+          `📱 *Username:* ${escapeMarkdown(saved.username ? '@' + saved.username : 'None')}\n` +
           `🆔 *Telegram ID:* \`${saved.telegram_id}\`\n` +
           `🔑 *Role Assigned:* *${saved.role.toUpperCase()}*\n` +
           `Approved by Manager ${manager.name} at ${formatTime(new Date())}`,
@@ -180,7 +268,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
         );
       } catch {}
 
-      // Notify the approved employee directly in their private chat
+      // Notify the approved employee directly
       try {
         await bot.telegram.sendMessage(
           targetId,
@@ -202,7 +290,6 @@ export function registerManagerHandlers(bot: Telegraf): void {
   // Interactive Team Management Menu
   // =========================================================================
 
-  // Send or edit Team Management Dashboard
   async function sendTeamDashboard(ctx: any, isEdit = false) {
     const user = await authenticateUser(ctx);
     if (!user || user.role !== 'manager') return;
@@ -384,16 +471,14 @@ export function registerManagerHandlers(bot: Telegraf): void {
 
     try {
       const existing = await db.getUser(targetId);
-      if (!existing) {
-        await ctx.answerCbQuery('User not found.', { show_alert: true });
-        return;
-      }
+      const name = existing?.name || `Staff Member`;
+      const username = existing?.username || null;
 
       const updated = await db.upsertUser({
         telegram_id: targetId,
-        name: existing.name,
+        name,
         role: newRole,
-        username: existing.username,
+        username,
       });
 
       await ctx.answerCbQuery(`Role updated to ${newRole.toUpperCase()}!`);
@@ -507,70 +592,66 @@ export function registerManagerHandlers(bot: Telegraf): void {
     });
 
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `➕ *Add New Team Member*\n\n` +
-      `Please send the employee's:\n` +
-      `• *Telegram Username* (e.g. \`@dawit_t\` or \`dawit_t\`)\n` +
-      `• OR *Numeric Telegram ID* (e.g. \`987654321\`)\n\n` +
-      `_(Optional: include their name after the username/ID, e.g. \`@dawit_t Dawit Tadesse\`)_\n\n` +
-      `_(Type /cancel to abort)_`,
-      { parse_mode: 'Markdown' }
-    );
+
+    const promptText =
+      `➕ *Add New Staff Member*\n\n` +
+      `Please reply with the employee's:\n` +
+      `• *Telegram Username* (e.g. \`@dawit_t\`)\n` +
+      `• OR *Numeric Telegram ID* (e.g. \`987654321\`)\n` +
+      `• OR both (e.g. \`@dawit_t 987654321\`)\n\n` +
+      `_(Optional: include their name, e.g. \`@dawit_t Dawit Tadesse\`)_\n\n` +
+      `Or use command: \`/add_user @username <role> [name]\``;
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('⬅️ Cancel', 'team_dashboard')],
+    ]);
+
+    try {
+      await ctx.editMessageText(promptText, {
+        parse_mode: 'Markdown',
+        ...keyboard,
+      });
+    } catch {
+      await ctx.reply(promptText, {
+        parse_mode: 'Markdown',
+        ...keyboard,
+      });
+    }
   });
 
   // Handle text input during Add User wizard
   bot.on('text', async (ctx, next) => {
-    if (ctx.chat.type !== 'private') return next();
-
     const session = getSession(ctx.from.id);
     if (!session || session.type !== 'add_user') {
       return next();
     }
 
     const text = ctx.message.text.trim();
-    if (text.startsWith('/')) return next();
-
-    const parts = text.split(/\s+/);
-    const firstToken = parts[0];
-    const customName = parts.length > 1 ? parts.slice(1).join(' ') : undefined;
-
-    let targetId: number | null = null;
-    let targetUsername: string | undefined = undefined;
-    let resolvedName: string = customName || 'Staff Member';
-
-    // 1. Check if numeric Telegram ID was provided
-    if (/^\d+$/.test(firstToken)) {
-      targetId = parseInt(firstToken, 10);
-    } else {
-      // 2. It's a username (e.g. @dawit or dawit)
-      const cleanUsername = firstToken.replace(/^@/, '').toLowerCase();
-      targetUsername = cleanUsername;
-
-      // Check in-memory cache
-      const cached = getKnownUserByUsername(cleanUsername);
-      if (cached) {
-        targetId = cached.id;
-        if (!customName) resolvedName = cached.name;
-      } else {
-        // Check database
-        try {
-          const dbUser = await db.getUserByUsername(cleanUsername);
-          if (dbUser) {
-            targetId = dbUser.telegram_id;
-            if (!customName) resolvedName = dbUser.name;
-          }
-        } catch {}
+    if (text.startsWith('/')) {
+      if (text === '/cancel') {
+        clearSession(ctx.from.id);
+        await ctx.reply('🔄 Add user cancelled.');
+        return;
       }
+      return next();
     }
 
-    if (!targetId) {
+    // Resolve user identity via Telegram API getChat, DB, or text
+    const resolved = await resolveUserIdentity(bot, text);
+
+    if (!resolved) {
+      let botUsername = 'the bot';
+      try {
+        const me = await bot.telegram.getMe();
+        if (me.username) botUsername = `@${me.username}`;
+      } catch {}
+
       await ctx.reply(
-        `⚠️ Could not resolve Telegram ID for \`${escapeMarkdown(firstToken)}\`.\n\n` +
-        `*Reason:* Telegram bots can only resolve usernames of users who have either sent /start to the bot or belong to the group.\n\n` +
-        `👉 *To resolve this:*\n` +
-        `1. Ask the employee to send /start to the bot, OR\n` +
-        `2. Enter their *numeric Telegram ID* directly (e.g. \`987654321\`).\n\n` +
-        `_(Type /cancel to exit)_`,
+        `⚠️ Could not automatically find Telegram ID for \`${escapeMarkdown(text)}\`.\n\n` +
+        `Telegram requires either:\n` +
+        `1. Send both username and ID: \`@username 123456789\`\n` +
+        `2. Ask the employee to send /start to ${botUsername} once so Telegram registers them.\n\n` +
+        `_(Type /cancel to abort)_`,
         { parse_mode: 'Markdown' }
       );
       return;
@@ -578,37 +659,38 @@ export function registerManagerHandlers(bot: Telegraf): void {
 
     clearSession(ctx.from.id);
 
-    // Prompt role assignment buttons
-    const userLabel = targetUsername ? `@${targetUsername}` : `ID: ${targetId}`;
+    // Pre-save basic info in Supabase so username & ID are stored
+    try {
+      const existing = await db.getUser(resolved.id);
+      await db.upsertUser({
+        telegram_id: resolved.id,
+        name: resolved.name,
+        role: existing?.role || 'sales',
+        username: resolved.username,
+      });
+    } catch (e: any) {
+      console.warn('[Add User] Note on initial upsert:', e.message);
+    }
+
+    const userLabel = resolved.username ? `@${resolved.username}` : `ID: ${resolved.id}`;
     const promptText =
-      `👤 *Select Role for ${escapeMarkdown(resolvedName)}* (${escapeMarkdown(userLabel)})\n\n` +
-      `Telegram ID: \`${targetId}\`\n\n` +
-      `Tap a role below to assign and activate their account:`;
+      `👤 *Staff Member Found!*\n\n` +
+      `• *Name:* ${escapeMarkdown(resolved.name)}\n` +
+      `• *Username:* ${escapeMarkdown(resolved.username ? '@' + resolved.username : 'None')}\n` +
+      `• *Telegram ID:* \`${resolved.id}\`\n\n` +
+      `👇 *Select their role to activate their account:*`;
 
     const buttons = [
       [
-        Markup.button.callback('💼 Sales Rep', `team_assign_${targetId}_sales`),
-        Markup.button.callback('📦 Store Staff', `team_assign_${targetId}_store`),
+        Markup.button.callback('💼 Sales Rep', `team_assign_${resolved.id}_sales`),
+        Markup.button.callback('📦 Store Staff', `team_assign_${resolved.id}_store`),
       ],
       [
-        Markup.button.callback('💳 Finance Analyst', `team_assign_${targetId}_finance`),
-        Markup.button.callback('👔 Manager', `team_assign_${targetId}_manager`),
+        Markup.button.callback('💳 Finance Analyst', `team_assign_${resolved.id}_finance`),
+        Markup.button.callback('👔 Manager', `team_assign_${resolved.id}_manager`),
       ],
       [Markup.button.callback('⬅️ Cancel', 'team_dashboard')],
     ];
-
-    // Pre-save basic name & username if existing record doesn't exist
-    try {
-      const existing = await db.getUser(targetId);
-      if (!existing) {
-        await db.upsertUser({
-          telegram_id: targetId,
-          name: resolvedName,
-          role: 'sales', // temporary placeholder before click
-          username: targetUsername,
-        });
-      }
-    } catch {}
 
     await ctx.reply(promptText, {
       parse_mode: 'Markdown',
@@ -616,7 +698,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
     });
   });
 
-  // Legacy command: /add_user <id_or_username> <role> <name...>
+  // Direct slash command: /add_user <username_or_id> <role> [name]
   bot.command('add_user', async (ctx) => {
     const user = await authenticateUser(ctx);
     if (!user || user.role !== 'manager') {
@@ -629,7 +711,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
 
     if (parts.length < 3) {
       await ctx.reply(
-        `ℹ️ *Usage:* \`/add_user <username_or_id> <role> [name]\`\n\n` +
+        `ℹ️ *Usage:* \`/add_user <@username_or_id> <role> [name]\`\n\n` +
         `*Roles:* \`sales\`, \`store\`, \`finance\`, \`manager\`\n\n` +
         `*Examples:*\n` +
         `• \`/add_user @dawit_t sales Dawit Tadesse\`\n` +
@@ -639,69 +721,57 @@ export function registerManagerHandlers(bot: Telegraf): void {
       return;
     }
 
-    const firstToken = parts[1];
-    const targetRole = parts[2].toLowerCase() as UserRole;
+    const identifier = parts[1];
+    const roleArg = parts[2].toLowerCase() as UserRole;
     const customName = parts.length > 3 ? parts.slice(3).join(' ') : undefined;
 
     const validRoles: UserRole[] = ['manager', 'store', 'finance', 'sales'];
-    if (!validRoles.includes(targetRole)) {
-      await ctx.reply(`⚠️ Invalid role. Allowed: ${validRoles.join(', ')}`);
+    if (!validRoles.includes(roleArg)) {
+      await ctx.reply(`⚠️ Invalid role '${roleArg}'. Allowed: ${validRoles.join(', ')}`);
       return;
     }
 
-    let targetId: number | null = null;
-    let targetUsername: string | undefined = undefined;
-    let resolvedName = customName || 'Staff Member';
-
-    if (/^\d+$/.test(firstToken)) {
-      targetId = parseInt(firstToken, 10);
-    } else {
-      const clean = firstToken.replace(/^@/, '').toLowerCase();
-      targetUsername = clean;
-      const cached = getKnownUserByUsername(clean);
-      if (cached) {
-        targetId = cached.id;
-        if (!customName) resolvedName = cached.name;
-      } else {
-        const dbUser = await db.getUserByUsername(clean);
-        if (dbUser) {
-          targetId = dbUser.telegram_id;
-          if (!customName) resolvedName = dbUser.name;
-        }
-      }
-    }
-
-    if (!targetId) {
+    const resolved = await resolveUserIdentity(bot, `${identifier} ${customName || ''}`);
+    if (!resolved) {
       await ctx.reply(
-        `⚠️ Could not resolve numeric ID for \`${firstToken}\`.\n` +
-        `Please provide their numeric Telegram ID, or have them send /start to the bot first.`
+        `⚠️ Could not resolve Telegram ID for \`${identifier}\`.\n` +
+        `Please provide their numeric Telegram ID, or send: \`/add_user @username <id> <role> [name]\``
       );
       return;
     }
 
     try {
       const saved = await db.upsertUser({
-        telegram_id: targetId,
-        name: resolvedName,
-        role: targetRole,
-        username: targetUsername,
+        telegram_id: resolved.id,
+        name: resolved.name,
+        role: roleArg,
+        username: resolved.username,
       });
 
       await ctx.reply(
-        `✅ *User Registered / Updated*\n\n` +
+        `✅ *Staff Member Added & Activated!*\n\n` +
         `👤 *Name:* ${escapeMarkdown(saved.name)}\n` +
+        `📱 *Username:* ${escapeMarkdown(saved.username ? '@' + saved.username : 'None')}\n` +
         `🆔 *Telegram ID:* \`${saved.telegram_id}\`\n` +
         `🔑 *Role:* *${saved.role.toUpperCase()}*\n\n` +
         `They can now message the bot directly with /start to begin.`,
         { parse_mode: 'Markdown' }
       );
+
+      try {
+        await bot.telegram.sendMessage(
+          saved.telegram_id,
+          `🎉 *Welcome!*\n\nYou have been registered as *${roleArg.toUpperCase()}* by Manager ${user.name}.\nSend /start to open your dashboard.`,
+          { parse_mode: 'Markdown' }
+        );
+      } catch {}
     } catch (err: any) {
       console.error('[Manager] Error adding user:', err);
-      await ctx.reply(`⚠️ Failed to add user: ${err.message}`);
+      await ctx.reply(`⚠️ Failed to save user: ${err.message}`);
     }
   });
 
-  // Legacy command: /remove_user <id>
+  // Direct slash command: /remove_user <id>
   bot.command('remove_user', async (ctx) => {
     const user = await authenticateUser(ctx);
     if (!user || user.role !== 'manager') {
