@@ -3,7 +3,7 @@ import { db } from '../supabase';
 import { config } from '../config';
 import { authenticateUser } from '../middleware/auth';
 import { getSession, setSession, clearSession } from '../state';
-import { escapeMarkdown, formatCurrency, getStatusBadge } from '../utils';
+import { escapeMarkdown, formatCurrency, getStatusBadge, cleanItemDetailsForSales, extractStoreExpenseHistory } from '../utils';
 
 export function registerSalesHandlers(bot: Telegraf): void {
   // Guard helper for 1-on-1 private chat
@@ -403,12 +403,16 @@ export function registerSalesHandlers(bot: Telegraf): void {
       // Fetch sales rep name for Finance card
       const salesUser = await db.getUser(telegramId);
       const repName = salesUser?.name || `Rep ID ${telegramId}`;
+      const expenseHistory = extractStoreExpenseHistory(updatedOrder.item_details);
+      const expenseLine = expenseHistory ? `\n🚚 Store Dispatch Expense: ${expenseHistory}` : '';
 
       // Forward to #Finance Topic with native photo and reconciliation card
       const financeCaption =
         `Payment Audit: Order #${updatedOrder.id}\n` +
-        `Sales Rep: ${repName} | Expected: ${formatCurrency(updatedOrder.total_amount)}\n` +
-        `[Photo: Attached Bank Screenshot]`;
+        `Sales Rep: ${escapeMarkdown(repName)} | Expected: ${formatCurrency(updatedOrder.total_amount)}\n` +
+        `Client: ${escapeMarkdown(updatedOrder.client_name)}\n` +
+        `Items: ${escapeMarkdown(cleanItemDetailsForSales(updatedOrder.item_details))}` +
+        expenseLine;
 
       await bot.telegram.sendPhoto(
         config.financeChatId,
@@ -426,6 +430,41 @@ export function registerSalesHandlers(bot: Telegraf): void {
           },
         }
       );
+
+      // If manager channel/topic is separate, also forward to Orders topic so Manager can approve as well
+      const isSameTopic =
+        config.ordersChatId === config.financeChatId &&
+        config.ordersThreadId === config.financeThreadId;
+
+      if (config.ordersChatId && !isSameTopic) {
+        try {
+          await bot.telegram.sendPhoto(
+            config.ordersChatId,
+            slipFileId,
+            {
+              caption:
+                `💳 *Payment Slip Submitted: Order #${updatedOrder.id}*\n` +
+                `Sales Rep: ${escapeMarkdown(repName)} | Expected: ${formatCurrency(updatedOrder.total_amount)}\n` +
+                `Client: ${escapeMarkdown(updatedOrder.client_name)}\n` +
+                `Items: ${escapeMarkdown(cleanItemDetailsForSales(updatedOrder.item_details))}` +
+                expenseLine +
+                `\n\n👉 *Finance / Manager Action:*`,
+              message_thread_id: config.ordersThreadId,
+              parse_mode: 'Markdown',
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    { text: '✅ Confirm Paid', callback_data: `finance_confirm_${updatedOrder.id}` },
+                    { text: '⚠️ Flag Discrepancy', callback_data: `finance_flag_${updatedOrder.id}` },
+                  ],
+                ],
+              },
+            }
+          );
+        } catch (managerForwardErr: any) {
+          console.warn('[Sales] Could not notify manager topic of payment slip:', managerForwardErr.message);
+        }
+      }
     } catch (err: any) {
       console.error(`[Sales] Error saving payment slip for order #${targetOrderId}:`, err);
       await ctx.reply('⚠️ Failed to save payment slip. Please try again.');

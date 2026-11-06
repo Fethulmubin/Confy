@@ -1,6 +1,7 @@
 import { Telegraf } from 'telegraf';
 import { db } from '../supabase';
-import { escapeMarkdown, formatCurrency } from '../utils';
+import { config } from '../config';
+import { escapeMarkdown, formatCurrency, cleanItemDetailsForSales } from '../utils';
 
 export function registerStoreHandlers(bot: Telegraf): void {
   // Store receipt photo upload handler in group/topic
@@ -106,7 +107,7 @@ export function registerStoreHandlers(bot: Telegraf): void {
 
       // 5. Reply in store topic acknowledging fulfillment
       const expenseNotice = extraExpense
-        ? `\n🚚 *Dispatch Expenses Added:* ${formatCurrency(extraExpense.amount)} (${escapeMarkdown(extraExpense.note)})\n💰 *New Total Amount:* ${formatCurrency(updatedOrder.total_amount)}`
+        ? `\n🚚 *Dispatch Expense Paid by Store:* ${formatCurrency(extraExpense.amount)} (${escapeMarkdown(extraExpense.note)})`
         : '';
 
       await ctx.reply(
@@ -118,11 +119,31 @@ export function registerStoreHandlers(bot: Telegraf): void {
         }
       );
 
+      // Notify Manager / Orders topic with history that store staff paid dispatch expenses
+      if (extraExpense && config.ordersChatId) {
+        try {
+          await bot.telegram.sendMessage(
+            config.ordersChatId,
+            `🚚 *Store Dispatch Expense Logged*\n\n` +
+            `Order: *#${updatedOrder.id}*\n` +
+            `Client: *${escapeMarkdown(updatedOrder.client_name)}*\n` +
+            `Paid by Store Staff: *${formatCurrency(extraExpense.amount)}*\n` +
+            `Details: \`${escapeMarkdown(extraExpense.note)}\`\n\n` +
+            `_(Logged for Manager history — not billed to sales)_`,
+            {
+              parse_mode: 'Markdown',
+              message_thread_id: config.ordersThreadId,
+            }
+          );
+        } catch (mErr: any) {
+          console.warn('[Store] Could not notify manager of dispatch expense:', mErr.message);
+        }
+      }
+
       // 6. ISOLATED DELIVERY: Send receipt photo ONLY to the owning sales rep's 1-on-1 private chat
+      // IMPORTANT: Do NOT send dispatch expenses to sales rep! It is strictly for manager history.
       try {
-        const extraBreakdown = extraExpense
-          ? `🚚 *Dispatch Expenses:* +${formatCurrency(extraExpense.amount)} (${escapeMarkdown(extraExpense.note)})\n`
-          : '';
+        const salesItems = cleanItemDetailsForSales(updatedOrder.item_details);
 
         await bot.telegram.sendPhoto(
           updatedOrder.sales_id,
@@ -131,8 +152,7 @@ export function registerStoreHandlers(bot: Telegraf): void {
             caption:
               `📦 *Store Release Receipt: Order #${updatedOrder.id}*\n\n` +
               `👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
-              `📋 *Items:* ${escapeMarkdown(updatedOrder.item_details)}\n` +
-              extraBreakdown +
+              `📋 *Items:* ${escapeMarkdown(salesItems)}\n` +
               `💰 *Total Amount to Collect:* ${formatCurrency(updatedOrder.total_amount)}\n\n` +
               `Status: *DISPATCHED*\n` +
               `The signed store release receipt is attached above.\n\n` +

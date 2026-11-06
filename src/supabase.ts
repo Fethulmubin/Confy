@@ -389,6 +389,37 @@ export const db = {
   },
 
   /**
+   * Fetch orders by status
+   */
+  async getOrdersByStatus(status: OrderStatus, limit = 20): Promise<Order[]> {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('status', status)
+      .order('id', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error(`[DB Error] getOrdersByStatus(${status}):`, error.message);
+      throw new Error(`Failed to fetch orders with status ${status}: ${error.message}`);
+    }
+
+    return (data || []).map((row) => ({
+      id: row.id,
+      sales_id: Number(row.sales_id),
+      client_name: row.client_name,
+      item_details: row.item_details,
+      total_amount: Number(row.total_amount),
+      status: row.status,
+      store_receipt_file_id: row.store_receipt_file_id,
+      payment_slip_file_id: row.payment_slip_file_id,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }));
+  },
+
+  /**
    * Update store receipt file_id and mark as dispatched (with optional delivery/labour expenses)
    */
   async setStoreReceipt(
@@ -407,9 +438,9 @@ export const db = {
     if (extraExpense && extraExpense.amount > 0) {
       const current = await this.getOrder(id);
       if (current) {
-        updatePayload.total_amount = Number(current.total_amount) + extraExpense.amount;
+        // Record store dispatch expense for manager audit history without changing client total_amount
         updatePayload.item_details =
-          `${current.item_details}\n[+ Dispatch Expense: ${extraExpense.note} (${extraExpense.amount} ETB)]`;
+          `${current.item_details}\n[Store Paid Dispatch: ${extraExpense.note} (${extraExpense.amount} ETB)]`;
       }
     }
 

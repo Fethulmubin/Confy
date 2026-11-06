@@ -174,4 +174,18 @@ const parsed3 = extractExpenses('Just standard release receipt');
 assert(parsed3 === null, 'No expenses found in standard caption');
 console.log('✅ Dispatch expense parsing tests passed.');
 
+// Test 7: Item details cleaning for sales and history extraction for manager
+console.log('Test 7: Sales privacy for store expenses & manager history tracking');
+const { cleanItemDetailsForSales, extractStoreExpenseHistory } = require('../src/utils');
+
+const rawItemsWithExpense = '20 bags of cement\n[Store Paid Dispatch: Truck: 300, Labour: 150 (450 ETB)]';
+const cleanedForSales = cleanItemDetailsForSales(rawItemsWithExpense);
+assert(cleanedForSales === '20 bags of cement', 'Cleaned items for sales rep matches original');
+assert(!cleanedForSales.includes('Store Paid Dispatch'), 'Sales rep does not see store paid dispatch');
+assert(!cleanedForSales.includes('450 ETB'), 'Sales rep does not see expense amount');
+
+const extractedExpense = extractStoreExpenseHistory(rawItemsWithExpense);
+assert(extractedExpense !== null && extractedExpense.includes('Truck: 300'), 'Manager history extracts dispatch expense note');
+console.log('✅ Sales privacy and manager history extraction tests passed.');
+
 console.log('🎉 All unit and logic tests passed successfully!');

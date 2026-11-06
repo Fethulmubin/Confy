@@ -47,3 +47,20 @@ export function getStatusBadge(status: OrderStatus): string {
       return status;
   }
 }
+
+/**
+ * Strips internal store dispatch expense notes from item details so sales reps don't see them
+ */
+export function cleanItemDetailsForSales(text: string | null | undefined): string {
+  if (!text) return '';
+  return text.replace(/\n?\[(?:Store Paid Dispatch|\+ Dispatch Expense):.*?\]/gi, '').trim();
+}
+
+/**
+ * Extracts store dispatch expense note if present in item details
+ */
+export function extractStoreExpenseHistory(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const match = text.match(/\[(?:Store Paid Dispatch|\+ Dispatch Expense):\s*(.*?)\]/i);
+  return match ? match[1] : null;
+}

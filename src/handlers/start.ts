@@ -47,13 +47,15 @@ export function registerStartHandlers(bot: Telegraf): void {
         roleDescription =
           'You are active as a *Manager* (Full System Access).\n' +
           '• Authorize incoming requisitions in the #Orders channel/topic.\n' +
-          '• Tap the button below to open the *Team Management Dashboard* to add staff, manage roles, or revoke access.\n' +
+          '• Audit and approve incoming payment slips (with full Finance access).\n' +
+          '• Open the *Team Management Dashboard* to add staff, manage roles, or revoke access.\n' +
           '• As Manager, you have full privileges across Sales, Store, and Finance!';
         keyboardMarkup = Markup.keyboard([
-          ['👥 Manage Team'],
+          ['👥 Manage Team', '💳 Pending Payments'],
         ]).resize();
         inlineMarkup = Markup.inlineKeyboard([
-          [Markup.button.callback('👥 Open Team Management Dashboard', 'team_dashboard')],
+          [Markup.button.callback('👥 Team Management Dashboard', 'team_dashboard')],
+          [Markup.button.callback('💳 Audit Pending Payments', 'list_pending_audit')],
         ]);
         break;
 
@@ -68,7 +70,14 @@ export function registerStartHandlers(bot: Telegraf): void {
         roleDescription =
           'You are active as a *Finance Analyst*.\n' +
           '• Dispatched orders with payment slips arrive in the #Finance channel/topic.\n' +
-          '• Verify payments against bank records and *Confirm Paid* or *Flag Discrepancy*.';
+          '• Verify payments against bank records and *Confirm Paid* or *Flag Discrepancy*.\n' +
+          '• Tap the button below or use /pending_payments to review payment slips.';
+        keyboardMarkup = Markup.keyboard([
+          ['💳 Pending Payments'],
+        ]).resize();
+        inlineMarkup = Markup.inlineKeyboard([
+          [Markup.button.callback('💳 Audit Pending Payments', 'list_pending_audit')],
+        ]);
         break;
     }
 
