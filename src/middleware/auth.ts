@@ -157,10 +157,14 @@ export async function checkCallbackRole(
       return null;
     }
 
-    if (!allowedRoles.includes(user.role)) {
+    // Manager can do anything across all departments
+    const isManager = user.roles.includes('manager') || user.role === 'manager';
+    const hasRole = allowedRoles.some((r) => user!.roles.includes(r) || user!.activeRole === r);
+
+    if (!isManager && !hasRole) {
       const rolesStr = allowedRoles.map((r) => r.toUpperCase()).join(' or ');
       await ctx.answerCbQuery(
-        `Access denied: ${rolesStr} action only. Your role is ${user.role.toUpperCase()}.`,
+        `Access denied: ${rolesStr} action only. Your active role is ${user.activeRole.toUpperCase()}.`,
         { show_alert: true }
       );
       return null;

@@ -11,7 +11,10 @@ export type OrderStatus =
 export interface User {
   telegram_id: number;
   name: string;
-  role: UserRole;
+  role: UserRole; // primary role in DB
+  roles: UserRole[]; // all assigned roles
+  activeRole: UserRole; // currently active role session
+  cleanName: string; // display name without role tags
   username?: string | null;
   created_at?: string;
 }

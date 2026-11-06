@@ -15,9 +15,12 @@ export function registerSalesHandlers(bot: Telegraf): void {
     const user = await authenticateUser(ctx);
     if (!user) return false;
 
-    if (user.role !== 'sales') {
+    const isManager = user.roles.includes('manager') || user.role === 'manager';
+    const isSales = user.roles.includes('sales') || user.activeRole === 'sales';
+
+    if (!isManager && !isSales) {
       await ctx.reply(
-        `⛔ *Permission Denied*\n\nThis function is restricted to Sales Representatives.\nYour role: *${user.role.toUpperCase()}*`,
+        `⛔ *Permission Denied*\n\nThis function is restricted to Sales Representatives.\nYour active role: *${user.activeRole.toUpperCase()}*`,
         { parse_mode: 'Markdown' }
       );
       return false;

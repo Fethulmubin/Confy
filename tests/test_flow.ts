@@ -122,4 +122,30 @@ assert(id3 < 0, 'Placeholder ID for fethulm must be negative');
 assert(id1 !== id3, 'Different usernames must produce distinct IDs');
 console.log(`✅ Deterministic placeholder ID tests passed (e.g. @dawit_t -> ${id1}).`);
 
+// Test 5: Multi-role parsing and manager permissions
+console.log('Test 5: Multi-role parsing and manager access');
+import { parseUserRow } from '../src/supabase';
+
+const multiUser = parseUserRow({
+  telegram_id: 12345,
+  name: 'Megfira [store,sales]',
+  role: 'store',
+  username: 'Mekfu24',
+});
+
+assert(multiUser.cleanName === 'Megfira', 'Clean name extracted without role tags');
+assert(multiUser.roles.length === 2, 'Two roles recognized');
+assert(multiUser.roles.includes('store') && multiUser.roles.includes('sales'), 'Roles match store and sales');
+assert(multiUser.activeRole === 'store', 'Primary role defaults to activeRole');
+
+const managerUser = parseUserRow({
+  telegram_id: 1186650834,
+  name: 'Primary Manager',
+  role: 'manager',
+  username: 'FETHULM',
+});
+assert(managerUser.roles.includes('manager'), 'Manager role parsed');
+assert(managerUser.cleanName === 'Primary Manager', 'Manager clean name');
+console.log('✅ Multi-role and manager parsing tests passed.');
+
 console.log('🎉 All unit and logic tests passed successfully!');

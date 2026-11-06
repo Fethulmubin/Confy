@@ -378,11 +378,11 @@ export function registerManagerHandlers(bot: Telegraf): void {
       };
 
       const buttons = allUsers.map((u) => {
-        const badge = roleBadges[u.role] || u.role.toUpperCase();
+        const badges = u.roles.map((r) => roleBadges[r] || r.toUpperCase()).join('/');
         const usernameLabel = u.username ? `@${u.username}` : `#${u.telegram_id}`;
         return [
           Markup.button.callback(
-            `[${badge}] ${u.name} (${usernameLabel})`,
+            `[${badges}] ${u.cleanName} (${usernameLabel})`,
             `team_view_user_${u.telegram_id}`
           ),
         ];
@@ -426,21 +426,28 @@ export function registerManagerHandlers(bot: Telegraf): void {
         targetUser.telegram_id > 0
           ? `\`${targetUser.telegram_id}\``
           : `_Pending_ (will link on /start)`;
+
+      const isTargetManager = targetUser.role === 'manager' || targetUser.roles.includes('manager');
       const text =
         `👤 *Staff Member Details*\n\n` +
-        `• *Name:* ${escapeMarkdown(targetUser.name)}\n` +
+        `• *Name:* ${escapeMarkdown(targetUser.cleanName)}\n` +
         `• *Username:* ${escapeMarkdown(usernameStr)}\n` +
         `• *Telegram ID:* ${idDisplay}\n` +
-        `• *Current Role:* *${targetUser.role.toUpperCase()}*\n\n` +
-        `What would you like to do?`;
+        `• *Assigned Roles:* *${targetUser.roles.map((r) => r.toUpperCase()).join(', ')}*` +
+        (isTargetManager ? ` _(Manager has all access)_` : '') +
+        `\n\nWhat would you like to do?`;
 
-      const buttons = [
-        [
-          Markup.button.callback('🔄 Change Role', `team_prompt_role_${targetUser.telegram_id}`),
-          Markup.button.callback('🗑️ Remove Access', `team_confirm_remove_${targetUser.telegram_id}`),
-        ],
-        [Markup.button.callback('⬅️ Back to Staff List', 'team_list_all')],
-      ];
+      const buttons = isTargetManager
+        ? [
+            [Markup.button.callback('⬅️ Back to Staff List', 'team_list_all')],
+          ]
+        : [
+            [
+              Markup.button.callback('🔄 Manage Roles', `team_prompt_role_${targetUser.telegram_id}`),
+              Markup.button.callback('🗑️ Remove Access', `team_confirm_remove_${targetUser.telegram_id}`),
+            ],
+            [Markup.button.callback('⬅️ Back to Staff List', 'team_list_all')],
+          ];
 
       await ctx.editMessageText(text, {
         parse_mode: 'Markdown',
@@ -465,21 +472,42 @@ export function registerManagerHandlers(bot: Telegraf): void {
       return;
     }
 
+    if (targetUser.role === 'manager' || targetUser.roles.includes('manager')) {
+      await ctx.answerCbQuery(
+        'The Manager has all permissions and cannot be reassigned to other roles.',
+        { show_alert: true }
+      );
+      return;
+    }
+
+    const assignedRoles = targetUser.roles;
     const text =
-      `🔄 *Select New Role for ${escapeMarkdown(targetUser.name)}*\n\n` +
-      `Current Role: *${targetUser.role.toUpperCase()}*\n\n` +
-      `Tap a role below to reassign:`;
+      `🔄 *Manage Roles for ${escapeMarkdown(targetUser.cleanName)}*\n\n` +
+      `Current Assigned Roles: *${assignedRoles.map((r) => r.toUpperCase()).join(', ')}*\n\n` +
+      `Tap a role below to add or remove it from this staff member:`;
+
+    const isSales = assignedRoles.includes('sales');
+    const isStore = assignedRoles.includes('store');
+    const isFinance = assignedRoles.includes('finance');
 
     const buttons = [
       [
-        Markup.button.callback('💼 Sales Rep', `team_assign_${targetId}_sales`),
-        Markup.button.callback('📦 Store Staff', `team_assign_${targetId}_store`),
+        Markup.button.callback(
+          `${isSales ? '✅' : '➕'} Sales Rep`,
+          `team_toggle_${targetId}_sales`
+        ),
+        Markup.button.callback(
+          `${isStore ? '✅' : '➕'} Store Staff`,
+          `team_toggle_${targetId}_store`
+        ),
       ],
       [
-        Markup.button.callback('💳 Finance Analyst', `team_assign_${targetId}_finance`),
-        Markup.button.callback('👔 Manager', `team_assign_${targetId}_manager`),
+        Markup.button.callback(
+          `${isFinance ? '✅' : '➕'} Finance Analyst`,
+          `team_toggle_${targetId}_finance`
+        ),
       ],
-      [Markup.button.callback('⬅️ Cancel', `team_view_user_${targetId}`)],
+      [Markup.button.callback('⬅️ Back', `team_view_user_${targetId}`)],
     ];
 
     await ctx.editMessageText(text, {
@@ -489,7 +517,94 @@ export function registerManagerHandlers(bot: Telegraf): void {
     await ctx.answerCbQuery();
   });
 
-  // Callback: Execute role reassignment
+  // Callback: Toggle role for user (multi-role management)
+  bot.action(/^team_toggle_(-?\d+)_([a-z]+)$/, async (ctx) => {
+    const manager = await checkCallbackRole(ctx, ['manager']);
+    if (!manager) return;
+
+    const targetId = parseInt(ctx.match[1], 10);
+    const toggledRole = ctx.match[2] as UserRole;
+
+    try {
+      const existing = await db.getUser(targetId);
+      if (!existing) {
+        await ctx.answerCbQuery('User not found.', { show_alert: true });
+        return;
+      }
+
+      if (existing.role === 'manager' || existing.roles.includes('manager')) {
+        await ctx.answerCbQuery(
+          'The Manager has all access and cannot be assigned other roles.',
+          { show_alert: true }
+        );
+        return;
+      }
+
+      const currentRoles = new Set(existing.roles);
+      if (currentRoles.has(toggledRole)) {
+        if (currentRoles.size <= 1) {
+          await ctx.answerCbQuery('Staff must retain at least one role.', { show_alert: true });
+          return;
+        }
+        currentRoles.delete(toggledRole);
+      } else {
+        currentRoles.add(toggledRole);
+      }
+
+      const newRolesList = Array.from(currentRoles);
+      const newPrimaryRole = newRolesList[0];
+      const newTaggedName = `${existing.cleanName} [${newRolesList.join(',')}]`;
+
+      const updated = await db.upsertUser({
+        telegram_id: targetId,
+        name: newTaggedName,
+        role: newPrimaryRole,
+        username: existing.username,
+      });
+
+      await ctx.answerCbQuery(`Updated roles: ${newRolesList.join(', ').toUpperCase()}`);
+
+      // Refresh the role manage menu
+      const isSales = newRolesList.includes('sales');
+      const isStore = newRolesList.includes('store');
+      const isFinance = newRolesList.includes('finance');
+
+      const text =
+        `🔄 *Manage Roles for ${escapeMarkdown(updated.cleanName)}*\n\n` +
+        `Current Assigned Roles: *${newRolesList.map((r) => r.toUpperCase()).join(', ')}*\n\n` +
+        `Tap a role below to add or remove it from this staff member:`;
+
+      const buttons = [
+        [
+          Markup.button.callback(
+            `${isSales ? '✅' : '➕'} Sales Rep`,
+            `team_toggle_${targetId}_sales`
+          ),
+          Markup.button.callback(
+            `${isStore ? '✅' : '➕'} Store Staff`,
+            `team_toggle_${targetId}_store`
+          ),
+        ],
+        [
+          Markup.button.callback(
+            `${isFinance ? '✅' : '➕'} Finance Analyst`,
+            `team_toggle_${targetId}_finance`
+          ),
+        ],
+        [Markup.button.callback('⬅️ Back', `team_view_user_${targetId}`)],
+      ];
+
+      await ctx.editMessageText(text, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons),
+      });
+    } catch (err: any) {
+      console.error('[Manager] Error toggling role:', err);
+      await ctx.answerCbQuery('Database error updating role.', { show_alert: true });
+    }
+  });
+
+  // Callback: Execute single role assignment (legacy fallback)
   bot.action(/^team_assign_(-?\d+)_([a-z]+)$/, async (ctx) => {
     const manager = await checkCallbackRole(ctx, ['manager']);
     if (!manager) return;
@@ -499,17 +614,22 @@ export function registerManagerHandlers(bot: Telegraf): void {
 
     try {
       const existing = await db.getUser(targetId);
-      const name = existing?.name || `Staff Member`;
+      if (existing && (existing.role === 'manager' || existing.roles.includes('manager'))) {
+        await ctx.answerCbQuery('Manager has all access and cannot be changed.', { show_alert: true });
+        return;
+      }
+
+      const name = existing?.cleanName || existing?.name || `Staff Member`;
       const username = existing?.username || null;
 
       const updated = await db.upsertUser({
         telegram_id: targetId,
-        name,
+        name: `${name} [${newRole}]`,
         role: newRole,
         username,
       });
 
-      await ctx.answerCbQuery(`Role updated to ${newRole.toUpperCase()}!`);
+      await ctx.answerCbQuery(`Role set to ${newRole.toUpperCase()}!`);
 
       // Notify the user in their private chat if their real Telegram ID is known
       if (targetId > 0) {
@@ -533,10 +653,10 @@ export function registerManagerHandlers(bot: Telegraf): void {
 
       await ctx.editMessageText(
         `✅ *Staff Member Added / Role Updated!*\n\n` +
-        `• *Name:* ${escapeMarkdown(updated.name)}\n` +
+        `• *Name:* ${escapeMarkdown(updated.cleanName)}\n` +
         `• *Username:* ${escapeMarkdown(usernameStr)}\n` +
         `• *Telegram ID:* ${idDisplay}\n` +
-        `• *Assigned Role:* *${updated.role.toUpperCase()}*\n\n` +
+        `• *Assigned Roles:* *${updated.roles.map((r) => r.toUpperCase()).join(', ')}*\n\n` +
         `Updated by ${manager.name} at ${formatTime(new Date())}`,
         {
           parse_mode: 'Markdown',
@@ -785,6 +905,12 @@ export function registerManagerHandlers(bot: Telegraf): void {
       return;
     }
 
+    const existingTarget = await db.getUser(resolved.id);
+    if (existingTarget && (existingTarget.role === 'manager' || existingTarget.roles.includes('manager'))) {
+      await ctx.reply('⛔ The Manager has all system permissions and cannot be reassigned to other roles.');
+      return;
+    }
+
     try {
       const saved = await db.upsertUser({
         telegram_id: resolved.id,
@@ -852,6 +978,12 @@ export function registerManagerHandlers(bot: Telegraf): void {
 
     if (isNaN(targetId) || targetId === user.telegram_id) {
       await ctx.reply('⚠️ Invalid Telegram ID / Username or cannot remove yourself.');
+      return;
+    }
+
+    const targetUser = await db.getUser(targetId);
+    if (targetUser && (targetUser.role === 'manager' || targetUser.roles.includes('manager'))) {
+      await ctx.reply('⛔ Cannot remove a Manager.');
       return;
     }
 

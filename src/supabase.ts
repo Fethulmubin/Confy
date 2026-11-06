@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { config } from './config';
 import { User, UserRole, Order, OrderStatus } from './types';
+import { getActiveRole } from './state';
 
 let supabaseClient: SupabaseClient | null = null;
 
@@ -18,6 +19,52 @@ export function getSupabase(): SupabaseClient {
     });
   }
   return supabaseClient;
+}
+
+/**
+ * Extracts clean name and all assigned roles from user row
+ */
+export function parseUserRow(data: any): User {
+  const telegramId = Number(data.telegram_id);
+  const rawName: string = data.name || '';
+  const primaryRole: UserRole = data.role as UserRole;
+
+  // Check if rawName contains role tags e.g. "Name [store,sales]" or "Name [sales]"
+  const match = rawName.match(/\[([a-zA-Z,\s]+)\]\s*$/);
+  let cleanName = rawName;
+  const rolesSet = new Set<UserRole>();
+
+  if (primaryRole) {
+    rolesSet.add(primaryRole);
+  }
+
+  if (match) {
+    cleanName = rawName.replace(/\[([a-zA-Z,\s]+)\]\s*$/, '').trim();
+    const taggedRoles = match[1]
+      .split(',')
+      .map((r) => r.trim().toLowerCase()) as UserRole[];
+    const validRoles: UserRole[] = ['manager', 'store', 'finance', 'sales'];
+    for (const r of taggedRoles) {
+      if (validRoles.includes(r)) {
+        rolesSet.add(r);
+      }
+    }
+  }
+
+  const roles = Array.from(rolesSet);
+  const inMemoryActive = getActiveRole(telegramId);
+  const activeRole = inMemoryActive && roles.includes(inMemoryActive) ? inMemoryActive : roles[0] || primaryRole;
+
+  return {
+    telegram_id: telegramId,
+    name: rawName,
+    role: primaryRole,
+    roles,
+    activeRole,
+    cleanName: cleanName || rawName,
+    username: data.username || null,
+    created_at: data.created_at,
+  };
 }
 
 export const db = {
@@ -39,13 +86,7 @@ export const db = {
 
     if (!data) return null;
 
-    return {
-      telegram_id: Number(data.telegram_id),
-      name: data.name,
-      role: data.role,
-      username: data.username || null,
-      created_at: data.created_at,
-    };
+    return parseUserRow(data);
   },
 
   /**
@@ -63,13 +104,7 @@ export const db = {
 
       if (error || !data) return null;
 
-      return {
-        telegram_id: Number(data.telegram_id),
-        name: data.name,
-        role: data.role,
-        username: data.username || null,
-        created_at: data.created_at,
-      };
+      return parseUserRow(data);
     } catch {
       return null;
     }
@@ -126,13 +161,7 @@ export const db = {
       throw new Error(`Failed to save user: ${error.message}`);
     }
 
-    return {
-      telegram_id: Number(data.telegram_id),
-      name: data.name,
-      role: data.role,
-      username: data.username || cleanUsername || null,
-      created_at: data.created_at,
-    };
+    return parseUserRow(data);
   },
 
   /**
@@ -151,13 +180,7 @@ export const db = {
       throw new Error(`Failed to list users: ${error.message}`);
     }
 
-    return (data || []).map((row) => ({
-      telegram_id: Number(row.telegram_id),
-      name: row.name,
-      role: row.role,
-      username: row.username || null,
-      created_at: row.created_at,
-    }));
+    return (data || []).map((row) => parseUserRow(row));
   },
 
   /**
@@ -223,13 +246,7 @@ export const db = {
       throw new Error(`Failed to update user Telegram ID: ${error.message}`);
     }
 
-    return {
-      telegram_id: Number(data.telegram_id),
-      name: data.name,
-      role: data.role,
-      username: data.username || cleanUsername || null,
-      created_at: data.created_at,
-    };
+    return parseUserRow(data);
   },
 
   /**

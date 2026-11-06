@@ -40,9 +40,16 @@ export function registerStoreHandlers(bot: Telegraf): void {
     const telegramId = ctx.from.id;
 
     try {
-      // 1. Role verification: must be 'store' (or 'manager')
+      // 1. Role verification: must have 'store' or 'manager' role
       const user = await db.getUser(telegramId);
-      if (!user || (user.role !== 'store' && user.role !== 'manager')) {
+      const isAuthorized =
+        user &&
+        (user.roles.includes('store') ||
+          user.roles.includes('manager') ||
+          user.role === 'store' ||
+          user.role === 'manager');
+
+      if (!isAuthorized) {
         await ctx.reply(
           `🚫 Access denied: Telegram ID ${telegramId} is not authorized for Store fulfillment actions.`,
           { reply_parameters: { message_id: message.message_id } }

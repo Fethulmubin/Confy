@@ -19,6 +19,23 @@ export function clearSession(userId: number): void {
 }
 
 /**
+ * In-memory active role selection for multi-role users
+ */
+export const activeUserRoles = new Map<number, import('./types').UserRole>();
+
+export function getActiveRole(userId: number): import('./types').UserRole | undefined {
+  return activeUserRoles.get(userId);
+}
+
+export function setActiveRole(userId: number, role: import('./types').UserRole): void {
+  activeUserRoles.set(userId, role);
+}
+
+export function clearActiveRole(userId: number): void {
+  activeUserRoles.delete(userId);
+}
+
+/**
  * Cache of known Telegram usernames mapped to numeric user details
  */
 export interface KnownUser {
