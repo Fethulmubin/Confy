@@ -389,17 +389,33 @@ export const db = {
   },
 
   /**
-   * Update store receipt file_id and mark as dispatched
+   * Update store receipt file_id and mark as dispatched (with optional delivery/labour expenses)
    */
-  async setStoreReceipt(id: number, fileId: string): Promise<Order> {
+  async setStoreReceipt(
+    id: number,
+    fileId: string,
+    extraExpense?: { amount: number; note: string }
+  ): Promise<Order> {
     const supabase = getSupabase();
+
+    let updatePayload: any = {
+      store_receipt_file_id: fileId,
+      status: 'dispatched',
+      updated_at: new Date().toISOString(),
+    };
+
+    if (extraExpense && extraExpense.amount > 0) {
+      const current = await this.getOrder(id);
+      if (current) {
+        updatePayload.total_amount = Number(current.total_amount) + extraExpense.amount;
+        updatePayload.item_details =
+          `${current.item_details}\n[+ Dispatch Expense: ${extraExpense.note} (${extraExpense.amount} ETB)]`;
+      }
+    }
+
     const { data, error } = await supabase
       .from('orders')
-      .update({
-        store_receipt_file_id: fileId,
-        status: 'dispatched',
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single();

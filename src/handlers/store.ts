@@ -74,17 +74,44 @@ export function registerStoreHandlers(bot: Telegraf): void {
         return;
       }
 
-      // 3. Capture native Telegram file_id
+      // 3. Capture native Telegram file_id and optional delivery/labour expenses from caption
       const photo = message.photo[message.photo.length - 1];
       const receiptFileId = photo.file_id;
+      const captionText = message.caption || '';
+
+      // Check if store staff provided delivery / truck / labour expenses in caption
+      // e.g., "Truck: 300, Labour: 150" or "+450 delivery" or "transport 500"
+      let extraExpense: { amount: number; note: string } | undefined = undefined;
+      const expenseMatches = captionText.matchAll(/(?:truck|labour|labor|transport|delivery|fee|exp|extra|\+)\s*[:=-]?\s*(\d+(?:\.\d+)?)/gi);
+      let totalExtra = 0;
+      const notes: string[] = [];
+
+      for (const m of expenseMatches) {
+        const val = parseFloat(m[1]);
+        if (!isNaN(val) && val > 0) {
+          totalExtra += val;
+          notes.push(m[0].trim());
+        }
+      }
+
+      if (totalExtra > 0) {
+        extraExpense = {
+          amount: totalExtra,
+          note: notes.join(', ') || `Delivery & Labour (${totalExtra} ETB)`,
+        };
+      }
 
       // 4. Update order in Supabase
-      const updatedOrder = await db.setStoreReceipt(orderId, receiptFileId);
+      const updatedOrder = await db.setStoreReceipt(orderId, receiptFileId, extraExpense);
 
       // 5. Reply in store topic acknowledging fulfillment
+      const expenseNotice = extraExpense
+        ? `\n🚚 *Dispatch Expenses Added:* ${formatCurrency(extraExpense.amount)} (${escapeMarkdown(extraExpense.note)})\n💰 *New Total Amount:* ${formatCurrency(updatedOrder.total_amount)}`
+        : '';
+
       await ctx.reply(
         `✅ *Order #${orderId} Dispatched*\n` +
-        `Release receipt saved. Delivery notice forwarded privately to sales representative.`,
+        `Release receipt saved. Delivery notice forwarded privately to sales representative.${expenseNotice}`,
         {
           parse_mode: 'Markdown',
           reply_parameters: { message_id: message.message_id },
@@ -93,6 +120,10 @@ export function registerStoreHandlers(bot: Telegraf): void {
 
       // 6. ISOLATED DELIVERY: Send receipt photo ONLY to the owning sales rep's 1-on-1 private chat
       try {
+        const extraBreakdown = extraExpense
+          ? `🚚 *Dispatch Expenses:* +${formatCurrency(extraExpense.amount)} (${escapeMarkdown(extraExpense.note)})\n`
+          : '';
+
         await bot.telegram.sendPhoto(
           updatedOrder.sales_id,
           receiptFileId,
@@ -101,7 +132,8 @@ export function registerStoreHandlers(bot: Telegraf): void {
               `📦 *Store Release Receipt: Order #${updatedOrder.id}*\n\n` +
               `👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
               `📋 *Items:* ${escapeMarkdown(updatedOrder.item_details)}\n` +
-              `💰 *Total:* ${formatCurrency(updatedOrder.total_amount)}\n\n` +
+              extraBreakdown +
+              `💰 *Total Amount to Collect:* ${formatCurrency(updatedOrder.total_amount)}\n\n` +
               `Status: *DISPATCHED*\n` +
               `The signed store release receipt is attached above.\n\n` +
               `👉 Please upload the bank transfer payment slip to proceed with finance audit.`,

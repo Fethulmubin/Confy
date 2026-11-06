@@ -182,7 +182,8 @@ export function registerManagerHandlers(bot: Telegraf): void {
         `Order #${updatedOrder.id} — Approved for Release\n` +
         `Client: ${escapeMarkdown(updatedOrder.client_name)}\n` +
         `Items: ${escapeMarkdown(updatedOrder.item_details)}\n\n` +
-        `Reply directly to this message with the signed store release receipt photo.`;
+        `Reply directly to this message with the signed store release receipt photo.\n` +
+        `💡 *Optional:* If there are transport/truck or labour expenses to be billed to the client, include them in your photo caption (e.g. \`Truck: 300, Labour: 150\` or \`+450 delivery\`).`;
 
       await bot.telegram.sendMessage(
         config.storeChatId,

@@ -148,4 +148,30 @@ assert(managerUser.roles.includes('manager'), 'Manager role parsed');
 assert(managerUser.cleanName === 'Primary Manager', 'Manager clean name');
 console.log('✅ Multi-role and manager parsing tests passed.');
 
+// Test 6: Expense regex parsing for truck, labour, delivery
+console.log('Test 6: Dispatch expense extraction from store caption');
+function extractExpenses(caption: string): { amount: number; note: string } | null {
+  const expenseMatches = caption.matchAll(/(?:truck|labour|labor|transport|delivery|fee|exp|extra|\+)\s*[:=-]?\s*(\d+(?:\.\d+)?)/gi);
+  let totalExtra = 0;
+  const notes: string[] = [];
+  for (const m of expenseMatches) {
+    const val = parseFloat(m[1]);
+    if (!isNaN(val) && val > 0) {
+      totalExtra += val;
+      notes.push(m[0].trim());
+    }
+  }
+  return totalExtra > 0 ? { amount: totalExtra, note: notes.join(', ') } : null;
+}
+
+const parsed1 = extractExpenses('Released! Truck: 300, Labour: 150');
+assert(parsed1 !== null && parsed1.amount === 450, 'Parsed 300 truck and 150 labour');
+
+const parsed2 = extractExpenses('Order dispatched +200 delivery');
+assert(parsed2 !== null && parsed2.amount === 200, 'Parsed +200 delivery');
+
+const parsed3 = extractExpenses('Just standard release receipt');
+assert(parsed3 === null, 'No expenses found in standard caption');
+console.log('✅ Dispatch expense parsing tests passed.');
+
 console.log('🎉 All unit and logic tests passed successfully!');
