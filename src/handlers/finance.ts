@@ -38,14 +38,15 @@ export function registerFinanceHandlers(bot: Telegraf): void {
       const roleTitle = isManager ? 'Manager' : 'Finance Analyst';
 
       const expenseHistory = extractStoreExpenseHistory(updatedOrder.item_details);
-      const expenseLine = expenseHistory ? `\n🚚 Store Dispatch Expense: ${expenseHistory}` : '';
+      const expenseLine = expenseHistory ? `\n> 🚚 *Store Dispatch Cost:* \`${escapeMarkdown(expenseHistory)}\`` : '';
 
       // 3. Edit message caption in-place to remove actionable buttons
       const updatedCaption =
-        `Payment Audit: Order #${updatedOrder.id}\n` +
-        `Sales Rep: ${escapeMarkdown(repName)} | Expected: ${formatCurrency(updatedOrder.total_amount)}\n` +
-        `Client: ${escapeMarkdown(updatedOrder.client_name)}\n` +
-        `Items: ${escapeMarkdown(cleanItemDetailsForSales(updatedOrder.item_details))}` +
+        `💳 *Payment Audit: Order #${updatedOrder.id}*\n\n` +
+        `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
+        `> 💼 *Sales Rep:* ${escapeMarkdown(repName)}\n` +
+        `> 💰 *Amount Settled:* *${formatCurrency(updatedOrder.total_amount)}*\n` +
+        `> 📦 *Items:* ${escapeMarkdown(cleanItemDetailsForSales(updatedOrder.item_details))}` +
         expenseLine +
         `\n\n✅ *Verified & Settled by ${roleTitle}* (${financeUser.name}) at ${timeStr}`;
 
@@ -54,7 +55,6 @@ export function registerFinanceHandlers(bot: Telegraf): void {
           parse_mode: 'Markdown',
         });
       } catch (editErr: any) {
-        // If message was text without caption
         try {
           await ctx.editMessageText(updatedCaption, { parse_mode: 'Markdown' });
         } catch {
@@ -68,10 +68,12 @@ export function registerFinanceHandlers(bot: Telegraf): void {
       try {
         await bot.telegram.sendMessage(
           updatedOrder.sales_id,
-          `🎉 *Order #${updatedOrder.id} Settled!*\n\n` +
-          `*${roleTitle}* (*${financeUser.name}*) has verified and confirmed the payment for *${escapeMarkdown(updatedOrder.client_name)}*.\n` +
-          `Total: *${formatCurrency(updatedOrder.total_amount)}*\n` +
-          `Status: *COMPLETED*.`,
+          `🎉 *Order #${updatedOrder.id} Fully Settled!*\n\n` +
+          `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
+          `> 💰 *Amount Paid:* *${formatCurrency(updatedOrder.total_amount)}*\n` +
+          `> 🛡️ *Audited by:* ${roleTitle} (${financeUser.name})\n` +
+          `> 🏁 *Status:* COMPLETED\n\n` +
+          `✨ _Payment has been verified. This order is officially completed!_`,
           { parse_mode: 'Markdown' }
         );
       } catch (notifyErr: any) {
@@ -122,17 +124,17 @@ export function registerFinanceHandlers(bot: Telegraf): void {
       const roleTitle = isManager ? 'Manager' : 'Finance Analyst';
 
       const expenseHistory = extractStoreExpenseHistory(updatedOrder.item_details);
-      const expenseLine = expenseHistory ? `\n🚚 Store Dispatch Expense: ${expenseHistory}` : '';
+      const expenseLine = expenseHistory ? `\n> 🚚 *Store Dispatch Cost:* \`${escapeMarkdown(expenseHistory)}\`` : '';
 
       // 3. Edit message caption in-place
       const updatedCaption =
-        `Payment Audit: Order #${updatedOrder.id}\n` +
-        `Sales Rep: ${escapeMarkdown(repName)} | Expected: ${formatCurrency(updatedOrder.total_amount)}\n` +
-        `Client: ${escapeMarkdown(updatedOrder.client_name)}\n` +
-        `Items: ${escapeMarkdown(cleanItemDetailsForSales(updatedOrder.item_details))}` +
+        `💳 *Payment Audit: Order #${updatedOrder.id}*\n\n` +
+        `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
+        `> 💼 *Sales Rep:* ${escapeMarkdown(repName)}\n` +
+        `> 💰 *Expected Amount:* *${formatCurrency(updatedOrder.total_amount)}*` +
         expenseLine +
         `\n\n⚠️ *Flagged by ${roleTitle}* (${financeUser.name}) at ${timeStr}\n` +
-        `Discrepancy reported. Returned to sales rep for correction.`;
+        `_Discrepancy reported. Returned to sales rep for correction._`;
 
       try {
         await ctx.editMessageCaption(updatedCaption, {
@@ -153,8 +155,10 @@ export function registerFinanceHandlers(bot: Telegraf): void {
         await bot.telegram.sendMessage(
           updatedOrder.sales_id,
           `⚠️ *Payment Slip Issue Flagged*\n\n` +
-          `*${roleTitle}* (*${financeUser.name}*) reviewed your payment slip for Order #${updatedOrder.id} and flagged a discrepancy.\n\n` +
-          `Please check the bank transaction and re-upload the correct payment slip below:`,
+          `> 🆔 *Order:* #${updatedOrder.id}\n` +
+          `> 👤 *Reviewer:* ${roleTitle} (${financeUser.name})\n` +
+          `> 💰 *Expected Amount:* *${formatCurrency(updatedOrder.total_amount)}*\n\n` +
+          `A discrepancy was found with the submitted bank transfer slip. Please check your transaction record and re-upload the correct payment slip below:`,
           {
             parse_mode: 'Markdown',
             reply_markup: {
@@ -216,17 +220,17 @@ export function registerFinanceHandlers(bot: Telegraf): void {
         const repName = salesRep?.name || `Rep ID ${order.sales_id}`;
         const storeExpense = extractStoreExpenseHistory(order.item_details);
         const expenseLine = storeExpense
-          ? `\n🚚 *Store Dispatch Expense (Paid):* \`${escapeMarkdown(storeExpense)}\``
+          ? `\n> 🚚 *Store Dispatch Cost:* \`${escapeMarkdown(storeExpense)}\``
           : '';
 
         const caption =
           `💳 *Payment Audit: Order #${order.id}*\n\n` +
-          `👤 *Client:* ${escapeMarkdown(order.client_name)}\n` +
-          `💼 *Sales Rep:* ${escapeMarkdown(repName)}\n` +
-          `📦 *Items:* ${escapeMarkdown(cleanItemDetailsForSales(order.item_details))}` +
+          `> 👤 *Client:* ${escapeMarkdown(order.client_name)}\n` +
+          `> 💼 *Sales Rep:* ${escapeMarkdown(repName)}\n` +
+          `> 📦 *Items:* ${escapeMarkdown(cleanItemDetailsForSales(order.item_details))}` +
           expenseLine +
-          `\n💰 *Total Expected:* *${formatCurrency(order.total_amount)}*\n\n` +
-          `👇 Verify bank transfer slip and approve or flag below:`;
+          `\n> 💰 *Total Expected:* *${formatCurrency(order.total_amount)}*\n\n` +
+          `👇 *Verify bank transfer slip and choose action:*`;
 
         const keyboard = [
           [

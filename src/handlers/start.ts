@@ -103,12 +103,16 @@ export function registerStartHandlers(bot: Telegraf): void {
       });
     }
 
+    const assignedText = availableRoles.length > 1
+      ? `\n> 🔑 *Assigned Roles:* ${user.roles.map((r) => r.toUpperCase()).join(', ')}`
+      : '';
+
     const greeting =
-      `👋 Welcome, *${user.cleanName}*!\n\n` +
-      `Active View: *${user.activeRole.toUpperCase()}*` +
-      (availableRoles.length > 1 ? ` _(Assigned: ${user.roles.map((r) => r.toUpperCase()).join(', ')})_` : '') +
+      `👋 *Welcome, ${user.cleanName}!*\n\n` +
+      `> 🎯 *Active View:* *${user.activeRole.toUpperCase()}*` +
+      assignedText +
       `\n\n${roleDescription}\n\n` +
-      `Type /help at any time for guidance or /cancel to reset active actions.`;
+      `💡 _Type /help at any time for guidance or /cancel to reset actions._`;
 
     // Combine inline buttons
     const inlineRows: any[] = [];

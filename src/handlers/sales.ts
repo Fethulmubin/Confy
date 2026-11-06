@@ -65,11 +65,12 @@ export function registerSalesHandlers(bot: Telegraf): void {
       const buttons: any[] = [];
 
       orders.forEach((o) => {
+        const cleanItems = cleanItemDetailsForSales(o.item_details);
         messageText +=
-          `• *Order #${o.id}* — ${escapeMarkdown(o.client_name)}\n` +
-          `  Total: ${formatCurrency(o.total_amount)}\n` +
-          `  Items: ${escapeMarkdown(o.item_details)}\n` +
-          `  Status: ${getStatusBadge(o.status)}\n\n`;
+          `*Order #${o.id}* — ${getStatusBadge(o.status)}\n` +
+          `> 👤 *Client:* ${escapeMarkdown(o.client_name)}\n` +
+          `> 💰 *Total:* ${formatCurrency(o.total_amount)}\n` +
+          `> 📦 *Items:* ${escapeMarkdown(cleanItems)}\n\n`;
 
         // If order was dispatched, offer quick upload button
         if (o.status === 'dispatched') {
@@ -195,32 +196,38 @@ export function registerSalesHandlers(bot: Telegraf): void {
       await ctx.answerCbQuery('Order created successfully!');
 
       // 2. Respond to sales rep in private chat
+      const confirmText =
+        `✅ *Order #${newOrder.id} Submitted!*\n\n` +
+        `> 👤 *Client:* ${escapeMarkdown(newOrder.client_name)}\n` +
+        `> 💰 *Total:* ${formatCurrency(newOrder.total_amount)}\n` +
+        `> ⏳ *Status:* Awaiting Manager Approval`;
+
       try {
-        await ctx.editMessageText(
-          `Order #${newOrder.id} submitted. Awaiting manager approval.`
-        );
+        await ctx.editMessageText(confirmText, { parse_mode: 'Markdown' });
       } catch {
-        await ctx.reply(
-          `Order #${newOrder.id} submitted. Awaiting manager approval.`
-        );
+        await ctx.reply(confirmText, { parse_mode: 'Markdown' });
       }
 
       // 3. Dispatch inline card to Manager Gate (#Orders Topic / Group)
       const managerCard =
-        `New Requisition: Order #${newOrder.id}\n` +
-        `Sales Rep: ${repName} | Total: ${formatCurrency(newOrder.total_amount)}\n` +
-        `Items: ${newOrder.item_details}`;
+        `📑 *New Requisition: Order #${newOrder.id}*\n\n` +
+        `> 💼 *Sales Rep:* ${escapeMarkdown(repName)}\n` +
+        `> 👤 *Client:* ${escapeMarkdown(newOrder.client_name)}\n` +
+        `> 📦 *Items:* ${escapeMarkdown(newOrder.item_details)}\n` +
+        `> 💰 *Total:* *${formatCurrency(newOrder.total_amount)}*\n\n` +
+        `👇 *Manager Action Required:*`;
 
       await bot.telegram.sendMessage(
         config.ordersChatId,
         managerCard,
         {
+          parse_mode: 'Markdown',
           message_thread_id: config.ordersThreadId,
           reply_markup: {
             inline_keyboard: [
               [
-                { text: 'Approve', callback_data: `approve_order_${newOrder.id}` },
-                { text: 'Reject', callback_data: `reject_order_${newOrder.id}` },
+                { text: '✅ Approve Release', callback_data: `approve_order_${newOrder.id}` },
+                { text: '❌ Reject', callback_data: `reject_order_${newOrder.id}` },
               ],
             ],
           },
@@ -396,7 +403,10 @@ export function registerSalesHandlers(bot: Telegraf): void {
       // Confirm to sales rep in 1-on-1 private chat
       await ctx.reply(
         `✅ *Payment Slip Received for Order #${updatedOrder.id}*\n\n` +
-        `The bank transfer slip has been forwarded to the Finance department for audit and settlement.`,
+        `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
+        `> 💰 *Amount Submitted:* *${formatCurrency(updatedOrder.total_amount)}*\n` +
+        `> 🔍 *Status:* Pending Finance Audit\n\n` +
+        `📨 _The bank transfer slip has been forwarded to Finance. You will be notified immediately once audited!_`,
         { parse_mode: 'Markdown' }
       );
 
@@ -404,15 +414,17 @@ export function registerSalesHandlers(bot: Telegraf): void {
       const salesUser = await db.getUser(telegramId);
       const repName = salesUser?.name || `Rep ID ${telegramId}`;
       const expenseHistory = extractStoreExpenseHistory(updatedOrder.item_details);
-      const expenseLine = expenseHistory ? `\n🚚 Store Dispatch Expense: ${expenseHistory}` : '';
+      const expenseLine = expenseHistory ? `\n> 🚚 *Store Dispatch Cost:* \`${escapeMarkdown(expenseHistory)}\`` : '';
 
-      // Forward to #Finance Topic with native photo and reconciliation card
+      // Forward ONLY to #Finance Topic with native photo and reconciliation card
       const financeCaption =
-        `Payment Audit: Order #${updatedOrder.id}\n` +
-        `Sales Rep: ${escapeMarkdown(repName)} | Expected: ${formatCurrency(updatedOrder.total_amount)}\n` +
-        `Client: ${escapeMarkdown(updatedOrder.client_name)}\n` +
-        `Items: ${escapeMarkdown(cleanItemDetailsForSales(updatedOrder.item_details))}` +
-        expenseLine;
+        `💳 *Payment Audit: Order #${updatedOrder.id}*\n\n` +
+        `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
+        `> 💼 *Sales Rep:* ${escapeMarkdown(repName)}\n` +
+        `> 💰 *Expected Amount:* *${formatCurrency(updatedOrder.total_amount)}*\n` +
+        `> 📦 *Items:* ${escapeMarkdown(cleanItemDetailsForSales(updatedOrder.item_details))}` +
+        expenseLine +
+        `\n\n👇 *Finance / Manager Action:* Verify bank screenshot and confirm or flag below:`;
 
       await bot.telegram.sendPhoto(
         config.financeChatId,
@@ -420,51 +432,17 @@ export function registerSalesHandlers(bot: Telegraf): void {
         {
           caption: financeCaption,
           message_thread_id: config.financeThreadId,
+          parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
               [
-                { text: 'Confirm Paid', callback_data: `finance_confirm_${updatedOrder.id}` },
-                { text: 'Flag Discrepancy', callback_data: `finance_flag_${updatedOrder.id}` },
+                { text: '✅ Confirm Paid', callback_data: `finance_confirm_${updatedOrder.id}` },
+                { text: '⚠️ Flag Discrepancy', callback_data: `finance_flag_${updatedOrder.id}` },
               ],
             ],
           },
         }
       );
-
-      // If manager channel/topic is separate, also forward to Orders topic so Manager can approve as well
-      const isSameTopic =
-        config.ordersChatId === config.financeChatId &&
-        config.ordersThreadId === config.financeThreadId;
-
-      if (config.ordersChatId && !isSameTopic) {
-        try {
-          await bot.telegram.sendPhoto(
-            config.ordersChatId,
-            slipFileId,
-            {
-              caption:
-                `💳 *Payment Slip Submitted: Order #${updatedOrder.id}*\n` +
-                `Sales Rep: ${escapeMarkdown(repName)} | Expected: ${formatCurrency(updatedOrder.total_amount)}\n` +
-                `Client: ${escapeMarkdown(updatedOrder.client_name)}\n` +
-                `Items: ${escapeMarkdown(cleanItemDetailsForSales(updatedOrder.item_details))}` +
-                expenseLine +
-                `\n\n👉 *Finance / Manager Action:*`,
-              message_thread_id: config.ordersThreadId,
-              parse_mode: 'Markdown',
-              reply_markup: {
-                inline_keyboard: [
-                  [
-                    { text: '✅ Confirm Paid', callback_data: `finance_confirm_${updatedOrder.id}` },
-                    { text: '⚠️ Flag Discrepancy', callback_data: `finance_flag_${updatedOrder.id}` },
-                  ],
-                ],
-              },
-            }
-          );
-        } catch (managerForwardErr: any) {
-          console.warn('[Sales] Could not notify manager topic of payment slip:', managerForwardErr.message);
-        }
-      }
     } catch (err: any) {
       console.error(`[Sales] Error saving payment slip for order #${targetOrderId}:`, err);
       await ctx.reply('⚠️ Failed to save payment slip. Please try again.');

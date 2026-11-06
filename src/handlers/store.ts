@@ -107,12 +107,15 @@ export function registerStoreHandlers(bot: Telegraf): void {
 
       // 5. Reply in store topic acknowledging fulfillment
       const expenseNotice = extraExpense
-        ? `\n🚚 *Dispatch Expense Paid by Store:* ${formatCurrency(extraExpense.amount)} (${escapeMarkdown(extraExpense.note)})`
+        ? `\n> 🚚 *Store Dispatch Cost:* ${formatCurrency(extraExpense.amount)} (${escapeMarkdown(extraExpense.note)})`
         : '';
 
       await ctx.reply(
-        `✅ *Order #${orderId} Dispatched*\n` +
-        `Release receipt saved. Delivery notice forwarded privately to sales representative.${expenseNotice}`,
+        `✅ *Order #${orderId} Dispatched*\n\n` +
+        `> 👤 *Client:* ${escapeMarkdown(order.client_name)}\n` +
+        `> 📦 *Status:* Signed Release Saved` +
+        expenseNotice +
+        `\n\n📨 _Release receipt forwarded privately to sales representative._`,
         {
           parse_mode: 'Markdown',
           reply_parameters: { message_id: message.message_id },
@@ -125,11 +128,10 @@ export function registerStoreHandlers(bot: Telegraf): void {
           await bot.telegram.sendMessage(
             config.ordersChatId,
             `🚚 *Store Dispatch Expense Logged*\n\n` +
-            `Order: *#${updatedOrder.id}*\n` +
-            `Client: *${escapeMarkdown(updatedOrder.client_name)}*\n` +
-            `Paid by Store Staff: *${formatCurrency(extraExpense.amount)}*\n` +
-            `Details: \`${escapeMarkdown(extraExpense.note)}\`\n\n` +
-            `_(Logged for Manager history — not billed to sales)_`,
+            `> 🆔 *Order:* #${updatedOrder.id}\n` +
+            `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
+            `> 💵 *Paid by Store Staff:* ${formatCurrency(extraExpense.amount)}\n` +
+            `> 📝 *Details:* ${escapeMarkdown(extraExpense.note)}`,
             {
               parse_mode: 'Markdown',
               message_thread_id: config.ordersThreadId,
@@ -151,12 +153,12 @@ export function registerStoreHandlers(bot: Telegraf): void {
           {
             caption:
               `📦 *Store Release Receipt: Order #${updatedOrder.id}*\n\n` +
-              `👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
-              `📋 *Items:* ${escapeMarkdown(salesItems)}\n` +
-              `💰 *Total Amount to Collect:* ${formatCurrency(updatedOrder.total_amount)}\n\n` +
-              `Status: *DISPATCHED*\n` +
-              `The signed store release receipt is attached above.\n\n` +
-              `👉 Please upload the bank transfer payment slip to proceed with finance audit.`,
+              `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
+              `> 📋 *Items:* ${escapeMarkdown(salesItems)}\n` +
+              `> 💰 *Total to Collect:* *${formatCurrency(updatedOrder.total_amount)}*\n` +
+              `> 📦 *Status:* Dispatched & Ready\n\n` +
+              `📎 *The signed store release receipt is attached above.*\n\n` +
+              `👉 Please upload the bank transfer payment slip below to proceed with finance audit:`,
             parse_mode: 'Markdown',
             reply_markup: {
               inline_keyboard: [

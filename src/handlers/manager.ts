@@ -151,10 +151,13 @@ export function registerManagerHandlers(bot: Telegraf): void {
       const timeStr = formatTime(new Date());
 
       const updatedCard =
-        `New Requisition: Order #${updatedOrder.id}\n` +
-        `Sales Rep: ${escapeMarkdown(repName)} | Total: ${formatCurrency(updatedOrder.total_amount)}\n` +
-        `Items: ${escapeMarkdown(updatedOrder.item_details)}\n\n` +
-        `✅ *Approved by Manager* (${manager.name}) at ${timeStr}`;
+        `📑 *Order #${updatedOrder.id} — Requisition Approved*\n\n` +
+        `> 💼 *Sales Rep:* ${escapeMarkdown(repName)}\n` +
+        `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
+        `> 📦 *Items:* ${escapeMarkdown(updatedOrder.item_details)}\n` +
+        `> 💰 *Total:* *${formatCurrency(updatedOrder.total_amount)}*\n\n` +
+        `✅ *Approved by Manager* (${manager.name}) at ${timeStr}\n` +
+        `📨 _Forwarded to Store topic for release._`;
 
       try {
         await ctx.editMessageText(updatedCard, { parse_mode: 'Markdown' });
@@ -169,8 +172,10 @@ export function registerManagerHandlers(bot: Telegraf): void {
         await bot.telegram.sendMessage(
           updatedOrder.sales_id,
           `✅ *Order #${updatedOrder.id} Approved!*\n\n` +
-          `Manager *${manager.name}* approved your order for *${escapeMarkdown(updatedOrder.client_name)}*.\n` +
-          `It has been forwarded to the Store for release.`,
+          `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
+          `> 👔 *Approved by:* ${manager.name}\n` +
+          `> 📦 *Status:* Forwarded to Store for Dispatch\n\n` +
+          `_Store staff will prepare the release receipt._`,
           { parse_mode: 'Markdown' }
         );
       } catch (notifyErr: any) {
@@ -179,16 +184,17 @@ export function registerManagerHandlers(bot: Telegraf): void {
 
       // Dispatch to #Store topic
       const storeMessage =
-        `Order #${updatedOrder.id} — Approved for Release\n` +
-        `Client: ${escapeMarkdown(updatedOrder.client_name)}\n` +
-        `Items: ${escapeMarkdown(updatedOrder.item_details)}\n\n` +
-        `Reply directly to this message with the signed store release receipt photo.\n` +
-        `💡 *Optional:* If there are transport/truck or labour expenses to be billed to the client, include them in your photo caption (e.g. \`Truck: 300, Labour: 150\` or \`+450 delivery\`).`;
+        `📦 *Order #${updatedOrder.id} — Approved for Release*\n\n` +
+        `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
+        `> 📋 *Items:* ${escapeMarkdown(updatedOrder.item_details)}\n\n` +
+        `📸 *Action:* Reply directly to this message with the signed release receipt photo.\n` +
+        `💡 *Optional:* If there are truck or labour expenses, include them in your caption (e.g. \`Truck: 300, Labour: 150\`).`;
 
       await bot.telegram.sendMessage(
         config.storeChatId,
         storeMessage,
         {
+          parse_mode: 'Markdown',
           message_thread_id: config.storeThreadId,
         }
       );
@@ -226,9 +232,10 @@ export function registerManagerHandlers(bot: Telegraf): void {
       const timeStr = formatTime(new Date());
 
       const updatedCard =
-        `New Requisition: Order #${updatedOrder.id}\n` +
-        `Sales Rep: ${escapeMarkdown(repName)} | Total: ${formatCurrency(updatedOrder.total_amount)}\n` +
-        `Items: ${escapeMarkdown(updatedOrder.item_details)}\n\n` +
+        `📑 *Order #${updatedOrder.id} — Requisition Rejected*\n\n` +
+        `> 💼 *Sales Rep:* ${escapeMarkdown(repName)}\n` +
+        `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
+        `> 💰 *Total:* ${formatCurrency(updatedOrder.total_amount)}\n\n` +
         `❌ *Rejected by Manager* (${manager.name}) at ${timeStr}`;
 
       try {
@@ -243,8 +250,9 @@ export function registerManagerHandlers(bot: Telegraf): void {
         await bot.telegram.sendMessage(
           updatedOrder.sales_id,
           `❌ *Order #${updatedOrder.id} Rejected*\n\n` +
-          `Manager *${manager.name}* rejected your requisition for *${escapeMarkdown(updatedOrder.client_name)}*.\n` +
-          `Status: *CANCELLED*.`,
+          `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
+          `> 👔 *Reviewed by:* ${manager.name}\n` +
+          `> 🚫 *Status:* CANCELLED`,
           { parse_mode: 'Markdown' }
         );
       } catch (notifyErr: any) {
