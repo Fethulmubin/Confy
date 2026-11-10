@@ -20,7 +20,7 @@ export function registerSalesHandlers(bot: Telegraf): void {
 
     if (!isManager && !isSales) {
       await ctx.reply(
-        `⛔ *Permission Denied*\n\nThis function is restricted to Sales Representatives.\nYour active role: *${user.activeRole.toUpperCase()}*`,
+        `⛔ *ፈቃድ የለዎትም (Permission Denied)*\n\nይህ ተግባር ለ Sales Representatives ብቻ የተፈቀደ ነው።\nየእርስዎ Active Role: *${user.activeRole.toUpperCase()}*`,
         { parse_mode: 'Markdown' }
       );
       return false;
@@ -38,9 +38,9 @@ export function registerSalesHandlers(bot: Telegraf): void {
     });
 
     await ctx.reply(
-      `📝 *New Order Requisition (Step 1/3)*\n\n` +
-      `Please enter the *Client Name*:\n\n` +
-      `_(Type /cancel to abort at any time)_`,
+      `📝 *አዲስ Order መመዝገቢያ (ደረጃ 1/3)*\n\n` +
+      `እባክዎ የ *Client ስም* ያስገቡ:\n\n` +
+      `_(በማንኛውም ሰዓት ለማቋረጥ /cancel ይበሉ)_`,
       { parse_mode: 'Markdown' }
     );
   };
@@ -56,12 +56,12 @@ export function registerSalesHandlers(bot: Telegraf): void {
       const orders = await db.getOrdersBySalesId(ctx.from.id, 10);
       if (orders.length === 0) {
         await ctx.reply(
-          `📋 You have no active or previous orders.\n\nType /new_order or tap the button to create your first order.`
+          `📋 ምንም Order የለዎትም።\n\nአዲስ order ለመመዝገብ /new_order ይጠቀሙ ወይም ከታች ያለውን button ይጫኑ።`
         );
         return;
       }
 
-      let messageText = `📋 *Your Recent Orders:*\n\n`;
+      let messageText = `📋 *የቅርብ Order-ኦችዎ:*\n\n`;
       const buttons: any[] = [];
 
       orders.forEach((o) => {
@@ -75,7 +75,7 @@ export function registerSalesHandlers(bot: Telegraf): void {
         // If order was dispatched, offer quick upload button
         if (o.status === 'dispatched') {
           buttons.push([
-            Markup.button.callback(`💳 Upload Slip for #${o.id}`, `start_slip_${o.id}`),
+            Markup.button.callback(`💳 የ #${o.id} Slip ላክ`, `start_slip_${o.id}`),
           ]);
         }
       });
@@ -90,7 +90,7 @@ export function registerSalesHandlers(bot: Telegraf): void {
       }
     } catch (err: any) {
       console.error('[Sales] Error fetching orders:', err);
-      await ctx.reply('⚠️ Failed to fetch your orders. Please try again.');
+      await ctx.reply('⚠️ Order-ኦችን ማምጣት አልተቻለም። እባክዎ በድጋሚ ይሞክሩ።');
     }
   };
 
@@ -105,7 +105,7 @@ export function registerSalesHandlers(bot: Telegraf): void {
     const orderId = parts.length > 1 ? parseInt(parts[1], 10) : NaN;
 
     if (isNaN(orderId)) {
-      await ctx.reply('Usage: /upload_slip <order_id>\nExample: /upload_slip 104');
+      await ctx.reply('አጠቃቀም: /upload_slip <order_id>\nምሳሌ: /upload_slip 104');
       return;
     }
 
@@ -118,7 +118,7 @@ export function registerSalesHandlers(bot: Telegraf): void {
     if (!user) return;
 
     if (user.role !== 'sales') {
-      await ctx.answerCbQuery('Access denied: Sales representatives only.', {
+      await ctx.answerCbQuery('ይህ ለ Sales Representative ብቻ የተፈቀደ ነው።', {
         show_alert: true,
       });
       return;
@@ -133,19 +133,19 @@ export function registerSalesHandlers(bot: Telegraf): void {
     try {
       const order = await db.getOrder(orderId);
       if (!order) {
-        await ctx.reply(`Order #${orderId} not found.`);
+        await ctx.reply(`Order #${orderId} አልተገኘም።`);
         return;
       }
 
       if (order.sales_id !== ctx.from.id) {
-        await ctx.reply('⛔ You can only submit payment slips for your own orders.');
+        await ctx.reply('⛔ የራስዎን order ብቻ ነው Payment Slip መላክ የሚችሉት።');
         return;
       }
 
       if (order.status !== 'dispatched') {
         await ctx.reply(
-          `⚠️ Order #${orderId} is currently '${order.status}'.\n` +
-          `Payment slips can only be submitted for dispatched orders.`
+          `⚠️ የ Order #${order.id} status '${order.status}' ስለሆነ slip መላክ አይቻልም።\n` +
+          `Payment Slip መላክ የሚቻለው ዕቃቸው Dispatched ለሆኑ order-ኦች ብቻ ነው።`
         );
         return;
       }
@@ -156,16 +156,16 @@ export function registerSalesHandlers(bot: Telegraf): void {
       });
 
       await ctx.reply(
-        `📸 *Payment Slip Submission for Order #${order.id}*\n\n` +
-        `Client: *${escapeMarkdown(order.client_name)}*\n` +
-        `Expected Amount: *${formatCurrency(order.total_amount)}*\n\n` +
-        `Please upload the bank transfer screenshot or receipt photo now.\n` +
-        `_(Type /cancel to abort)_`,
+        `📸 *የ Payment Slip መላኪያ — Order #${order.id}*\n\n` +
+        `> 👤 *Client:* *${escapeMarkdown(order.client_name)}*\n` +
+        `> 💰 *የሚጠበቅ ክፍያ:* *${formatCurrency(order.total_amount)}*\n\n` +
+        `እባክዎ የባንክ screenshot ወይም የተከፈለበትን Receipt ፎቶ አሁን ይላኩ።\n` +
+        `_(ለማቋረጥ /cancel)_`,
         { parse_mode: 'Markdown' }
       );
     } catch (err: any) {
       console.error(`[Sales] Error initiating slip upload for order #${orderId}:`, err);
-      await ctx.reply('⚠️ Error preparing slip submission.');
+      await ctx.reply('⚠️ የ Slip መላኪያ ማዘጋጀት አልተቻለም።');
     }
   }
 
@@ -173,7 +173,7 @@ export function registerSalesHandlers(bot: Telegraf): void {
   bot.action('confirm_new_order', async (ctx) => {
     const session = getSession(ctx.from.id);
     if (!session || session.type !== 'create_order' || session.draft.step !== 'confirming') {
-      await ctx.answerCbQuery('Session expired. Please restart with /new_order.');
+      await ctx.answerCbQuery('Session አልቋል። እባክዎ በ /new_order እንደገና ይጀምሩ።');
       return;
     }
 
@@ -193,14 +193,14 @@ export function registerSalesHandlers(bot: Telegraf): void {
         status: 'pending_approval',
       });
 
-      await ctx.answerCbQuery('Order created successfully!');
+      await ctx.answerCbQuery('Order በተሳካ ሁኔታ ተፈጥሯል!');
 
       // 2. Respond to sales rep in private chat
       const confirmText =
-        `✅ *Order #${newOrder.id} Submitted!*\n\n` +
+        `✅ *Order #${newOrder.id} ተልኳል!*\n\n` +
         `> 👤 *Client:* ${escapeMarkdown(newOrder.client_name)}\n` +
-        `> 💰 *Total:* ${formatCurrency(newOrder.total_amount)}\n` +
-        `> ⏳ *Status:* Awaiting Manager Approval`;
+        `> 💰 *ጠቅላላ ዋጋ:* ${formatCurrency(newOrder.total_amount)}\n` +
+        `> ⏳ *Status:* Manager Approval በመጠበቅ ላይ`;
 
       try {
         await ctx.editMessageText(confirmText, { parse_mode: 'Markdown' });
@@ -210,12 +210,12 @@ export function registerSalesHandlers(bot: Telegraf): void {
 
       // 3. Dispatch inline card to Manager Gate (#Orders Topic / Group)
       const managerCard =
-        `📑 *New Requisition: Order #${newOrder.id}*\n\n` +
+        `📑 *አዲስ Order Requisition: #${newOrder.id}*\n\n` +
         `> 💼 *Sales Rep:* ${escapeMarkdown(repName)}\n` +
         `> 👤 *Client:* ${escapeMarkdown(newOrder.client_name)}\n` +
         `> 📦 *Items:* ${escapeMarkdown(newOrder.item_details)}\n` +
-        `> 💰 *Total:* *${formatCurrency(newOrder.total_amount)}*\n\n` +
-        `👇 *Manager Action Required:*`;
+        `> 💰 *ጠቅላላ ዋጋ:* *${formatCurrency(newOrder.total_amount)}*\n\n` +
+        `👇 *የ Manager ውሳኔ ይጠበቃል:*`;
 
       await bot.telegram.sendMessage(
         config.ordersChatId,
@@ -226,8 +226,8 @@ export function registerSalesHandlers(bot: Telegraf): void {
           reply_markup: {
             inline_keyboard: [
               [
-                { text: '✅ Approve Release', callback_data: `approve_order_${newOrder.id}` },
-                { text: '❌ Reject', callback_data: `reject_order_${newOrder.id}` },
+                { text: '✅ Approve (ልቀቁ)', callback_data: `approve_order_${newOrder.id}` },
+                { text: '❌ Reject (ሰርዝ)', callback_data: `reject_order_${newOrder.id}` },
               ],
             ],
           },
@@ -235,17 +235,17 @@ export function registerSalesHandlers(bot: Telegraf): void {
       );
     } catch (err: any) {
       console.error('[Sales] Error creating order:', err);
-      await ctx.reply('⚠️ Failed to save order to database. Please try again.');
+      await ctx.reply('⚠️ Order ማስቀመጥ አልተቻለም። እባክዎ በድጋሚ ይሞክሩ።');
     }
   });
 
   bot.action('cancel_new_order', async (ctx) => {
     clearSession(ctx.from.id);
-    await ctx.answerCbQuery('Order creation cancelled.');
+    await ctx.answerCbQuery('Order ተሰርዟል።');
     try {
-      await ctx.editMessageText('❌ Order requisition cancelled.');
+      await ctx.editMessageText('❌ የ Order ምዝገባው ተሰርዟል።');
     } catch {
-      await ctx.reply('❌ Order requisition cancelled.');
+      await ctx.reply('❌ የ Order ምዝገባው ተሰርዟል።');
     }
   });
 
@@ -270,10 +270,10 @@ export function registerSalesHandlers(bot: Telegraf): void {
         draft.clientName = text;
         draft.step = 'waiting_items';
         await ctx.reply(
-          `📝 *New Order Requisition (Step 2/3)*\n\n` +
-          `Client: *${escapeMarkdown(draft.clientName)}*\n\n` +
-          `Please enter the *Item Details* (e.g. 50x Product A):\n\n` +
-          `_(Type /cancel to abort)_`,
+          `📝 *አዲስ Order መመዝገቢያ (ደረጃ 2/3)*\n\n` +
+          `> 👤 *Client:* *${escapeMarkdown(draft.clientName)}*\n\n` +
+          `እባክዎ የ *ዕቃዎች ዝርዝር (Items)* ያስገቡ (ምሳሌ: 50x ሲሚንቶ):\n\n` +
+          `_(ለማቋረጥ /cancel)_`,
           { parse_mode: 'Markdown' }
         );
         break;
@@ -283,10 +283,10 @@ export function registerSalesHandlers(bot: Telegraf): void {
         draft.itemDetails = text;
         draft.step = 'waiting_amount';
         await ctx.reply(
-          `📝 *New Order Requisition (Step 3/3)*\n\n` +
-          `Client: *${escapeMarkdown(draft.clientName)}*\n` +
-          `Items: *${escapeMarkdown(draft.itemDetails)}*\n\n` +
-          `Please enter the *Total Amount* in ETB (numbers only, e.g. 12500):`,
+          `📝 *አዲስ Order መመዝገቢያ (ደረጃ 3/3)*\n\n` +
+          `> 👤 *Client:* *${escapeMarkdown(draft.clientName)}*\n` +
+          `> 📦 *Items:* *${escapeMarkdown(draft.itemDetails)}*\n\n` +
+          `እባክዎ *ጠቅላላ ዋጋ በ ETB* ያስገቡ (ቁጥር ብቻ, ምሳሌ: 12500):`,
           { parse_mode: 'Markdown' }
         );
         break;
@@ -298,7 +298,7 @@ export function registerSalesHandlers(bot: Telegraf): void {
 
         if (isNaN(amount) || amount <= 0) {
           await ctx.reply(
-            `⚠️ Please enter a valid positive numeric amount (e.g. 12500):`
+            `⚠️ እባክዎ ትክክለኛ የብር መጠን በቁጥር ብቻ ያስገቡ (ምሳሌ: 12500):`
           );
           return;
         }
@@ -307,11 +307,11 @@ export function registerSalesHandlers(bot: Telegraf): void {
         draft.step = 'confirming';
 
         const summary =
-          `📋 *Order Confirmation*\n\n` +
-          `👤 *Client:* ${escapeMarkdown(draft.clientName)}\n` +
-          `📦 *Items:* ${escapeMarkdown(draft.itemDetails)}\n` +
-          `💰 *Total Amount:* ${formatCurrency(draft.totalAmount)}\n\n` +
-          `Would you like to submit this requisition for manager approval?`;
+          `📋 *የ Order ማረጋገጫ (Confirmation)*\n\n` +
+          `> 👤 *Client:* ${escapeMarkdown(draft.clientName)}\n` +
+          `> 📦 *Items:* ${escapeMarkdown(draft.itemDetails)}\n` +
+          `> 💰 *ጠቅላላ ዋጋ:* ${formatCurrency(draft.totalAmount)}\n\n` +
+          `ይህ Order ለ Manager approval እንዲላክ ይፈልጋሉ?`;
 
         await ctx.reply(summary, {
           parse_mode: 'Markdown',
@@ -366,8 +366,8 @@ export function registerSalesHandlers(bot: Telegraf): void {
 
     if (!targetOrderId) {
       await ctx.reply(
-        `⚠️ Please specify which order this payment slip is for.\n\n` +
-        `Use /upload_slip <order_id> or tap [ Upload Slip ] under /my_orders.`
+        `⚠️ እባክዎ ይህ Payment Slip ለየትኛው order እንደሆነ ይጥቀሱ።\n\n` +
+        `/upload_slip <order_id> ይጠቀሙ ወይም በ /my_orders ውስጥ [ Slip ላክ ] የሚለውን ይጫኑ።`
       );
       return;
     }
@@ -375,19 +375,19 @@ export function registerSalesHandlers(bot: Telegraf): void {
     try {
       const order = await db.getOrder(targetOrderId);
       if (!order) {
-        await ctx.reply(`Order #${targetOrderId} not found.`);
+        await ctx.reply(`Order #${targetOrderId} አልተገኘም።`);
         return;
       }
 
       if (order.sales_id !== telegramId) {
-        await ctx.reply('⛔ You can only upload payment slips for your own orders.');
+        await ctx.reply('⛔ የራስዎን order ብቻ ነው Payment Slip መላክ የሚችሉት።');
         return;
       }
 
       if (order.status !== 'dispatched') {
         await ctx.reply(
-          `⚠️ Order #${order.id} is currently '${order.status}'.\n` +
-          `A payment slip can only be submitted for dispatched orders awaiting payment.`
+          `⚠️ የ Order #${order.id} status '${order.status}' ስለሆነ slip መላክ አይቻልም።\n` +
+          `Payment Slip መላክ የሚቻለው ዕቃቸው Dispatched ለሆኑ order-ኦች ብቻ ነው።`
         );
         return;
       }
@@ -402,11 +402,11 @@ export function registerSalesHandlers(bot: Telegraf): void {
 
       // Confirm to sales rep in 1-on-1 private chat
       await ctx.reply(
-        `✅ *Payment Slip Received for Order #${updatedOrder.id}*\n\n` +
+        `✅ *የ Payment Slip ደርሷል — Order #${updatedOrder.id}*\n\n` +
         `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
-        `> 💰 *Amount Submitted:* *${formatCurrency(updatedOrder.total_amount)}*\n` +
-        `> 🔍 *Status:* Pending Finance Audit\n\n` +
-        `📨 _The bank transfer slip has been forwarded to Finance. You will be notified immediately once audited!_`,
+        `> 💰 *የተከፈለ መጠን:* *${formatCurrency(updatedOrder.total_amount)}*\n` +
+        `> 🔍 *Status:* Finance Audit በመጠበቅ ላይ\n\n` +
+        `📨 _የባንክ ማስተላለፊያ ደረሰኝ ለ Finance ተልኳል። እንደተረጋገጠ መልእክት ይደርስዎታል!_`,
         { parse_mode: 'Markdown' }
       );
 
@@ -421,10 +421,10 @@ export function registerSalesHandlers(bot: Telegraf): void {
         `💳 *Payment Audit: Order #${updatedOrder.id}*\n\n` +
         `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
         `> 💼 *Sales Rep:* ${escapeMarkdown(repName)}\n` +
-        `> 💰 *Expected Amount:* *${formatCurrency(updatedOrder.total_amount)}*\n` +
+        `> 💰 *የሚጠበቅ መጠን:* *${formatCurrency(updatedOrder.total_amount)}*\n` +
         `> 📦 *Items:* ${escapeMarkdown(cleanItemDetailsForSales(updatedOrder.item_details))}` +
         expenseLine +
-        `\n\n👇 *Finance / Manager Action:* Verify bank screenshot and confirm or flag below:`;
+        `\n\n👇 *Finance / Manager:* የባንክ screenshot በማረጋገጥ ከታች ይምረጡ:`;
 
       await bot.telegram.sendPhoto(
         config.financeChatId,
@@ -436,8 +436,8 @@ export function registerSalesHandlers(bot: Telegraf): void {
           reply_markup: {
             inline_keyboard: [
               [
-                { text: '✅ Confirm Paid', callback_data: `finance_confirm_${updatedOrder.id}` },
-                { text: '⚠️ Flag Discrepancy', callback_data: `finance_flag_${updatedOrder.id}` },
+                { text: '✅ Confirm Paid (ተከፍሏል)', callback_data: `finance_confirm_${updatedOrder.id}` },
+                { text: '⚠️ Flag Discrepancy (ችግር አለ)', callback_data: `finance_flag_${updatedOrder.id}` },
               ],
             ],
           },
@@ -445,7 +445,7 @@ export function registerSalesHandlers(bot: Telegraf): void {
       );
     } catch (err: any) {
       console.error(`[Sales] Error saving payment slip for order #${targetOrderId}:`, err);
-      await ctx.reply('⚠️ Failed to save payment slip. Please try again.');
+      await ctx.reply('⚠️ የ Payment Slip ማስቀመጥ አልተቻለም። እባክዎ በድጋሚ ይሞክሩ።');
     }
   });
 }

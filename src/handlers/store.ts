@@ -52,7 +52,7 @@ export function registerStoreHandlers(bot: Telegraf): void {
 
       if (!isAuthorized) {
         await ctx.reply(
-          `🚫 Access denied: Telegram ID ${telegramId} is not authorized for Store fulfillment actions.`,
+          `🚫 Access አልተፈቀደም: Telegram ID ${telegramId} ለ Store ስራዎች የተፈቀደለት አይደለም።`,
           { reply_parameters: { message_id: message.message_id } }
         );
         return;
@@ -61,7 +61,7 @@ export function registerStoreHandlers(bot: Telegraf): void {
       // 2. Fetch and validate order status
       const order = await db.getOrder(orderId);
       if (!order) {
-        await ctx.reply(`Order #${orderId} not found in database.`, {
+        await ctx.reply(`Order #${orderId} በሲስተሙ ውስጥ አልተገኘም።`, {
           reply_parameters: { message_id: message.message_id },
         });
         return;
@@ -69,7 +69,7 @@ export function registerStoreHandlers(bot: Telegraf): void {
 
       if (order.status !== 'pending_dispatch') {
         await ctx.reply(
-          `⚠️ Order #${orderId} cannot be dispatched because its status is '${order.status}'.`,
+          `⚠️ የ Order #${orderId} status '${order.status}' ስለሆነ Dispatch ማድረግ አይቻልም።`,
           { reply_parameters: { message_id: message.message_id } }
         );
         return;
@@ -81,9 +81,9 @@ export function registerStoreHandlers(bot: Telegraf): void {
       const captionText = message.caption || '';
 
       // Check if store staff provided delivery / truck / labour expenses in caption
-      // e.g., "Truck: 300, Labour: 150" or "+450 delivery" or "transport 500"
+      // e.g., "Truck: 300, Labour: 150" or "+450 delivery" or "ጭነት 300 ጉልበት 150"
       let extraExpense: { amount: number; note: string } | undefined = undefined;
-      const expenseMatches = captionText.matchAll(/(?:truck|labour|labor|transport|delivery|fee|exp|extra|\+)\s*[:=-]?\s*(\d+(?:\.\d+)?)/gi);
+      const expenseMatches = captionText.matchAll(/(?:truck|labour|labor|transport|delivery|fee|exp|extra|\+|ጭነት|ጉልበት)\s*[:=-]?\s*(\d+(?:\.\d+)?)/gi);
       let totalExtra = 0;
       const notes: string[] = [];
 
@@ -107,15 +107,15 @@ export function registerStoreHandlers(bot: Telegraf): void {
 
       // 5. Reply in store topic acknowledging fulfillment
       const expenseNotice = extraExpense
-        ? `\n> 🚚 *Store Dispatch Cost:* ${formatCurrency(extraExpense.amount)} (${escapeMarkdown(extraExpense.note)})`
+        ? `\n> 🚚 *የተከፈለ ተጨማሪ ወጪ:* ${formatCurrency(extraExpense.amount)} (${escapeMarkdown(extraExpense.note)})`
         : '';
 
       await ctx.reply(
-        `✅ *Order #${orderId} Dispatched*\n\n` +
+        `✅ *Order #${orderId} Dispatched ሆኗል*\n\n` +
         `> 👤 *Client:* ${escapeMarkdown(order.client_name)}\n` +
-        `> 📦 *Status:* Signed Release Saved` +
+        `> 📦 *Status:* Store Receipt ተመዝግቧል` +
         expenseNotice +
-        `\n\n📨 _Release receipt forwarded privately to sales representative._`,
+        `\n\n📨 _የ Store Release Receipt ለ Sales Representative በግል ተልኳል።_`,
         {
           parse_mode: 'Markdown',
           reply_parameters: { message_id: message.message_id },
@@ -155,16 +155,16 @@ export function registerStoreHandlers(bot: Telegraf): void {
               `📦 *Store Release Receipt: Order #${updatedOrder.id}*\n\n` +
               `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
               `> 📋 *Items:* ${escapeMarkdown(salesItems)}\n` +
-              `> 💰 *Total to Collect:* *${formatCurrency(updatedOrder.total_amount)}*\n` +
+              `> 💰 *የሚሰበሰብ ጠቅላላ ዋጋ:* *${formatCurrency(updatedOrder.total_amount)}*\n` +
               `> 📦 *Status:* Dispatched & Ready\n\n` +
-              `📎 *The signed store release receipt is attached above.*\n\n` +
-              `👉 Please upload the bank transfer payment slip below to proceed with finance audit:`,
+              `📎 *የተፈረመበት የ Store Release Receipt ከላይ ተያይዟል።*\n\n` +
+              `👉 እባክዎ ደንበኛው የከፈለበትን የባንክ Payment Slip ከታች ይላኩ:`,
             parse_mode: 'Markdown',
             reply_markup: {
               inline_keyboard: [
                 [
                   {
-                    text: `💳 Upload Payment Slip for #${updatedOrder.id}`,
+                    text: `💳 የ #${updatedOrder.id} Payment Slip ላክ`,
                     callback_data: `start_slip_${updatedOrder.id}`,
                   },
                 ],
@@ -180,7 +180,7 @@ export function registerStoreHandlers(bot: Telegraf): void {
       }
     } catch (err: any) {
       console.error(`[Store] Error handling receipt photo for order #${orderId}:`, err);
-      await ctx.reply(`⚠️ Database error processing store receipt for Order #${orderId}.`, {
+      await ctx.reply(`⚠️ Store Receipt በማስቀመጥ ላይ ችግር ተፈጥሯል (Order #${orderId}).`, {
         reply_parameters: { message_id: message.message_id },
       });
     }

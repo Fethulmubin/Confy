@@ -133,13 +133,13 @@ export function registerManagerHandlers(bot: Telegraf): void {
     try {
       const order = await db.getOrder(orderId);
       if (!order) {
-        await ctx.answerCbQuery(`Order #${orderId} not found.`, { show_alert: true });
+        await ctx.answerCbQuery(`Order #${orderId} አልተገኘም።`, { show_alert: true });
         return;
       }
 
       if (order.status !== 'pending_approval') {
         await ctx.answerCbQuery(
-          `Order #${orderId} is already '${order.status}'. Cannot approve.`,
+          `Order #${orderId} አስቀድሞ '${order.status}' ላይ ነው። ማጽደቅ አይቻልም።`,
           { show_alert: true }
         );
         return;
@@ -156,8 +156,8 @@ export function registerManagerHandlers(bot: Telegraf): void {
         `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
         `> 📦 *Items:* ${escapeMarkdown(updatedOrder.item_details)}\n` +
         `> 💰 *Total:* *${formatCurrency(updatedOrder.total_amount)}*\n\n` +
-        `✅ *Approved by Manager* (${manager.name}) at ${timeStr}\n` +
-        `📨 _Forwarded to Store topic for release._`;
+        `✅ *በ Manager (${manager.name}) ጸድቋል (Approved)* በ ${timeStr}\n` +
+        `📨 _ዕቃው እንዲወጣ ወደ Store topic ተልኳል።_`;
 
       try {
         await ctx.editMessageText(updatedCard, { parse_mode: 'Markdown' });
@@ -165,17 +165,17 @@ export function registerManagerHandlers(bot: Telegraf): void {
         console.warn('[Manager] Could not edit message text:', editErr.message);
       }
 
-      await ctx.answerCbQuery(`Order #${orderId} approved successfully!`);
+      await ctx.answerCbQuery(`Order #${orderId} በስኬት ጸድቋል!`);
 
       // Notify sales rep
       try {
         await bot.telegram.sendMessage(
           updatedOrder.sales_id,
-          `✅ *Order #${updatedOrder.id} Approved!*\n\n` +
+          `✅ *Order #${updatedOrder.id} ጸድቋል (Approved)!*\n\n` +
           `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
-          `> 👔 *Approved by:* ${manager.name}\n` +
-          `> 📦 *Status:* Forwarded to Store for Dispatch\n\n` +
-          `_Store staff will prepare the release receipt._`,
+          `> 👔 *ያጸደቀው Manager:* ${manager.name}\n` +
+          `> 📦 *Status:* ለ Dispatch ወደ Store ተላልፏል\n\n` +
+          `_የ Store ሰራተኛ ዕቃውን አዘጋጅቶ Store Receipt ይልካል።_`,
           { parse_mode: 'Markdown' }
         );
       } catch (notifyErr: any) {
@@ -184,11 +184,11 @@ export function registerManagerHandlers(bot: Telegraf): void {
 
       // Dispatch to #Store topic
       const storeMessage =
-        `📦 *Order #${updatedOrder.id} — Approved for Release*\n\n` +
+        `📦 *Order #${updatedOrder.id} — እንዲወጣ ተፈቅዷል (Approved for Release)*\n\n` +
         `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
         `> 📋 *Items:* ${escapeMarkdown(updatedOrder.item_details)}\n\n` +
-        `📸 *Action:* Reply directly to this message with the signed release receipt photo.\n` +
-        `💡 *Optional:* If there are truck or labour expenses, include them in your caption (e.g. \`Truck: 300, Labour: 150\`).`;
+        `📸 *Action:* ይህን መልእክት reply በማድረግ የተፈረመበትን Store Receipt ፎቶ ይላኩ።\n` +
+        `💡 *ማስታወሻ:* የጭነት ወይም የጉልበት ወጪ ካለ በ caption ላይ ይጥቀሱ (ምሳሌ: \`ጭነት: 300, ጉልበት: 150\`)።`;
 
       await bot.telegram.sendMessage(
         config.storeChatId,
@@ -200,7 +200,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
       );
     } catch (err: any) {
       console.error(`[Manager] Error approving order #${orderId}:`, err);
-      await ctx.answerCbQuery('Database error during approval.', { show_alert: true });
+      await ctx.answerCbQuery('Order በማጽደቅ ሂደት ላይ የ database ስህተት አጋጥሟል።', { show_alert: true });
     }
   });
 
@@ -214,13 +214,13 @@ export function registerManagerHandlers(bot: Telegraf): void {
     try {
       const order = await db.getOrder(orderId);
       if (!order) {
-        await ctx.answerCbQuery(`Order #${orderId} not found.`, { show_alert: true });
+        await ctx.answerCbQuery(`Order #${orderId} አልተገኘም።`, { show_alert: true });
         return;
       }
 
       if (order.status !== 'pending_approval') {
         await ctx.answerCbQuery(
-          `Order #${orderId} is already '${order.status}'. Cannot reject.`,
+          `Order #${orderId} አስቀድሞ '${order.status}' ላይ ነው። Cancel ማድረግ አይቻልም።`,
           { show_alert: true }
         );
         return;
@@ -236,7 +236,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
         `> 💼 *Sales Rep:* ${escapeMarkdown(repName)}\n` +
         `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
         `> 💰 *Total:* ${formatCurrency(updatedOrder.total_amount)}\n\n` +
-        `❌ *Rejected by Manager* (${manager.name}) at ${timeStr}`;
+        `❌ *በ Manager (${manager.name}) ተሰርዟል (Rejected)* በ ${timeStr}`;
 
       try {
         await ctx.editMessageText(updatedCard, { parse_mode: 'Markdown' });
@@ -244,14 +244,14 @@ export function registerManagerHandlers(bot: Telegraf): void {
         console.warn('[Manager] Could not edit message text:', editErr.message);
       }
 
-      await ctx.answerCbQuery(`Order #${orderId} rejected.`);
+      await ctx.answerCbQuery(`Order #${orderId} ተሰርዟል (Rejected)።`);
 
       try {
         await bot.telegram.sendMessage(
           updatedOrder.sales_id,
-          `❌ *Order #${updatedOrder.id} Rejected*\n\n` +
+          `❌ *Order #${updatedOrder.id} አልጸደቀም (Rejected)*\n\n` +
           `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
-          `> 👔 *Reviewed by:* ${manager.name}\n` +
+          `> 👔 *ያየው Manager:* ${manager.name}\n` +
           `> 🚫 *Status:* CANCELLED`,
           { parse_mode: 'Markdown' }
         );
@@ -260,7 +260,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
       }
     } catch (err: any) {
       console.error(`[Manager] Error rejecting order #${orderId}:`, err);
-      await ctx.answerCbQuery('Database error during rejection.', { show_alert: true });
+      await ctx.answerCbQuery('Order በመሰረዝ ሂደት ላይ የ database ስህተት አጋጥሟል።', { show_alert: true });
     }
   });
 
@@ -287,16 +287,16 @@ export function registerManagerHandlers(bot: Telegraf): void {
         username,
       });
 
-      await ctx.answerCbQuery(`Access granted! Assigned as ${assignedRole.toUpperCase()}.`);
+      await ctx.answerCbQuery(`Access ተፈቅዷል! እንደ ${assignedRole.toUpperCase()} ተመድቧል።`);
 
       try {
         await ctx.editMessageText(
-          `✅ *Access Request Approved*\n\n` +
-          `👤 *Name:* ${escapeMarkdown(saved.name)}\n` +
-          `📱 *Username:* ${escapeMarkdown(saved.username ? '@' + saved.username : 'None')}\n` +
+          `✅ *የ Access ጥያቄ ጸድቋል*\n\n` +
+          `👤 *ስም:* ${escapeMarkdown(saved.name)}\n` +
+          `📱 *Username:* ${escapeMarkdown(saved.username ? '@' + saved.username : 'የለም')}\n` +
           `🆔 *Telegram ID:* \`${saved.telegram_id}\`\n` +
-          `🔑 *Role Assigned:* *${saved.role.toUpperCase()}*\n` +
-          `Approved by Manager ${manager.name} at ${formatTime(new Date())}`,
+          `🔑 *የተሰጠው Role:* *${saved.role.toUpperCase()}*\n` +
+          `በ Manager ${manager.name} ጸድቋል በ ${formatTime(new Date())}`,
           { parse_mode: 'Markdown' }
         );
       } catch {}
@@ -305,9 +305,9 @@ export function registerManagerHandlers(bot: Telegraf): void {
       try {
         await bot.telegram.sendMessage(
           targetId,
-          `🎉 *Access Granted!*\n\n` +
-          `Manager *${manager.name}* has approved your access and assigned you the role: *${assignedRole.toUpperCase()}*.\n\n` +
-          `Please send /start to open your dashboard.`,
+          `🎉 *Access ተፈቅዶልዎታል!*\n\n` +
+          `Manager *${manager.name}* ፈቃድ ሰጥተዎታል: *${assignedRole.toUpperCase()}* Role ተመድበዋል።\n\n` +
+          `Bot-ቱን ለመጠቀም /start ይጫኑ።`,
           { parse_mode: 'Markdown' }
         );
       } catch (dmErr: any) {
@@ -315,7 +315,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
       }
     } catch (err: any) {
       console.error('[Manager] Error granting access:', err);
-      await ctx.answerCbQuery('Failed to update user role in database.', { show_alert: true });
+      await ctx.answerCbQuery('የሰራተኛውን Role በ database ውስጥ በማስቀመጥ ላይ ስህተት አጋጥሟል።', { show_alert: true });
     }
   });
 
@@ -330,14 +330,14 @@ export function registerManagerHandlers(bot: Telegraf): void {
     try {
       const allUsers = await db.getAllUsers();
       const text =
-        `👥 *Team Management Dashboard*\n\n` +
-        `Current Registered Staff: *${allUsers.length}*\n\n` +
-        `Choose an action below to manage team members and assign roles:`;
+        `👥 *የ Team Dashboard*\n\n` +
+        `> 👥 *የተመዘገቡ ሰራተኞች:* *${allUsers.length}*\n\n` +
+        `ሰራተኞችን ለማየት፣ አዲስ ለመጨመር ወይም Role ለመቀየር ከታች ይምረጡ:`;
 
       const keyboard = Markup.inlineKeyboard([
         [
-          Markup.button.callback('📋 View All Staff', 'team_list_all'),
-          Markup.button.callback('➕ Add Staff Member', 'team_start_add'),
+          Markup.button.callback('📋 የሰራተኞች ዝርዝር (All Staff)', 'team_list_all'),
+          Markup.button.callback('➕ አዲስ ሰራተኛ ጨምር (Add Staff)', 'team_start_add'),
         ],
       ]);
 
@@ -348,7 +348,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
       }
     } catch (err: any) {
       console.error('[Manager] Error loading dashboard:', err);
-      await ctx.reply('⚠️ Error opening Team Management Dashboard.');
+      await ctx.reply('⚠️ Team Dashboard በመክፈት ላይ ስህተት አጋጥሟል።');
     }
   }
 
@@ -375,7 +375,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
     try {
       const allUsers = await db.getAllUsers();
       if (allUsers.length === 0) {
-        await ctx.answerCbQuery('No users registered.');
+        await ctx.answerCbQuery('ምንም የተመዘገበ ሰራተኛ የለም።');
         return;
       }
 
@@ -398,13 +398,13 @@ export function registerManagerHandlers(bot: Telegraf): void {
       });
 
       buttons.push([
-        Markup.button.callback('➕ Add New Staff', 'team_start_add'),
-        Markup.button.callback('⬅️ Back', 'team_dashboard'),
+        Markup.button.callback('➕ አዲስ ሰራተኛ ጨምር', 'team_start_add'),
+        Markup.button.callback('⬅️ ተመለስ', 'team_dashboard'),
       ]);
 
       await ctx.editMessageText(
-        `📋 *Registered Staff Members (${allUsers.length})*\n\n` +
-        `Tap on any employee below to view details, change their role, or remove them:`,
+        `📋 *የተመዘገቡ ሰራተኞች (${allUsers.length})*\n\n` +
+        `ሰራተኛውን ለማየት፣ role ለመቀየር ወይም ለማስወገድ ከታች ይጫኑ:`,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard(buttons),
@@ -413,7 +413,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
       await ctx.answerCbQuery();
     } catch (err: any) {
       console.error('[Manager] Error listing users:', err);
-      await ctx.answerCbQuery('Error loading staff list.', { show_alert: true });
+      await ctx.answerCbQuery('የሰራተኞችን ዝርዝር በማምጣት ላይ ስህተት አጋጥሟል።', { show_alert: true });
     }
   });
 
@@ -426,36 +426,36 @@ export function registerManagerHandlers(bot: Telegraf): void {
     try {
       const targetUser = await db.getUser(targetId);
       if (!targetUser) {
-        await ctx.answerCbQuery('User not found in database.', { show_alert: true });
+        await ctx.answerCbQuery('ተጠቃሚው በ database ውስጥ አልተገኘም።', { show_alert: true });
         return;
       }
 
-      const usernameStr = targetUser.username ? `@${targetUser.username}` : 'None';
+      const usernameStr = targetUser.username ? `@${targetUser.username}` : 'የለም';
       const idDisplay =
         targetUser.telegram_id > 0
           ? `\`${targetUser.telegram_id}\``
-          : `_Pending_ (will link on /start)`;
+          : `_Pending_ (/start ሲጫኑ ይያያዛል)`;
 
       const isTargetManager = targetUser.role === 'manager' || targetUser.roles.includes('manager');
       const text =
-        `👤 *Staff Member Details*\n\n` +
-        `• *Name:* ${escapeMarkdown(targetUser.cleanName)}\n` +
+        `👤 *የሰራተኛ መረጃ (Staff Details)*\n\n` +
+        `• *ስም:* ${escapeMarkdown(targetUser.cleanName)}\n` +
         `• *Username:* ${escapeMarkdown(usernameStr)}\n` +
         `• *Telegram ID:* ${idDisplay}\n` +
-        `• *Assigned Roles:* *${targetUser.roles.map((r) => r.toUpperCase()).join(', ')}*` +
-        (isTargetManager ? ` _(Manager has all access)_` : '') +
-        `\n\nWhat would you like to do?`;
+        `• *የተሰጡ Roles:* *${targetUser.roles.map((r) => r.toUpperCase()).join(', ')}*` +
+        (isTargetManager ? ` _(Manager ሙሉ access አለው)_` : '') +
+        `\n\nምን ማድረግ ይፈልጋሉ?`;
 
       const buttons = isTargetManager
         ? [
-            [Markup.button.callback('⬅️ Back to Staff List', 'team_list_all')],
+            [Markup.button.callback('⬅️ ወደ ሰራተኞች ዝርዝር', 'team_list_all')],
           ]
         : [
             [
-              Markup.button.callback('🔄 Manage Roles', `team_prompt_role_${targetUser.telegram_id}`),
-              Markup.button.callback('🗑️ Remove Access', `team_confirm_remove_${targetUser.telegram_id}`),
+              Markup.button.callback('🔄 Role ቀይር (Manage Roles)', `team_prompt_role_${targetUser.telegram_id}`),
+              Markup.button.callback('🗑️ Access ሰርዝ (Remove)', `team_confirm_remove_${targetUser.telegram_id}`),
             ],
-            [Markup.button.callback('⬅️ Back to Staff List', 'team_list_all')],
+            [Markup.button.callback('⬅️ ወደ ሰራተኞች ዝርዝር', 'team_list_all')],
           ];
 
       await ctx.editMessageText(text, {
@@ -465,7 +465,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
       await ctx.answerCbQuery();
     } catch (err: any) {
       console.error('[Manager] Error viewing user:', err);
-      await ctx.answerCbQuery('Error loading user.', { show_alert: true });
+      await ctx.answerCbQuery('የሰራተኛውን መረጃ በማምጣት ላይ ስህተት አጋጥሟል።', { show_alert: true });
     }
   });
 
@@ -477,13 +477,13 @@ export function registerManagerHandlers(bot: Telegraf): void {
     const targetId = parseInt(ctx.match[1], 10);
     const targetUser = await db.getUser(targetId);
     if (!targetUser) {
-      await ctx.answerCbQuery('User not found.', { show_alert: true });
+      await ctx.answerCbQuery('ተጠቃሚው አልተገኘም።', { show_alert: true });
       return;
     }
 
     if (targetUser.role === 'manager' || targetUser.roles.includes('manager')) {
       await ctx.answerCbQuery(
-        'The Manager has all permissions and cannot be reassigned to other roles.',
+        'Manager ሙሉ access ስላለው ሌላ role መቀየር አይቻልም።',
         { show_alert: true }
       );
       return;
@@ -491,9 +491,9 @@ export function registerManagerHandlers(bot: Telegraf): void {
 
     const assignedRoles = targetUser.roles;
     const text =
-      `🔄 *Manage Roles for ${escapeMarkdown(targetUser.cleanName)}*\n\n` +
-      `Current Assigned Roles: *${assignedRoles.map((r) => r.toUpperCase()).join(', ')}*\n\n` +
-      `Tap a role below to add or remove it from this staff member:`;
+      `🔄 *የ ${escapeMarkdown(targetUser.cleanName)} Role ማስተካከያ*\n\n` +
+      `የአሁን Roles: *${assignedRoles.map((r) => r.toUpperCase()).join(', ')}*\n\n` +
+      `Role ለመጨመር ወይም ለማንሳት ከታች ያሉትን ይጫኑ:`;
 
     const isSales = assignedRoles.includes('sales');
     const isStore = assignedRoles.includes('store');
@@ -516,7 +516,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
           `team_toggle_${targetId}_finance`
         ),
       ],
-      [Markup.button.callback('⬅️ Back', `team_view_user_${targetId}`)],
+      [Markup.button.callback('⬅️ ተመለስ', `team_view_user_${targetId}`)],
     ];
 
     await ctx.editMessageText(text, {
@@ -537,13 +537,13 @@ export function registerManagerHandlers(bot: Telegraf): void {
     try {
       const existing = await db.getUser(targetId);
       if (!existing) {
-        await ctx.answerCbQuery('User not found.', { show_alert: true });
+        await ctx.answerCbQuery('ተጠቃሚው አልተገኘም።', { show_alert: true });
         return;
       }
 
       if (existing.role === 'manager' || existing.roles.includes('manager')) {
         await ctx.answerCbQuery(
-          'The Manager has all access and cannot be assigned other roles.',
+          'Manager ሙሉ access ስላለው ሌላ role መቀየር አይቻልም።',
           { show_alert: true }
         );
         return;
@@ -552,7 +552,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
       const currentRoles = new Set(existing.roles);
       if (currentRoles.has(toggledRole)) {
         if (currentRoles.size <= 1) {
-          await ctx.answerCbQuery('Staff must retain at least one role.', { show_alert: true });
+          await ctx.answerCbQuery('ሰራተኛው ቢያንስ አንድ Role ሊኖረው ይገባል።', { show_alert: true });
           return;
         }
         currentRoles.delete(toggledRole);
@@ -571,7 +571,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
         username: existing.username,
       });
 
-      await ctx.answerCbQuery(`Updated roles: ${newRolesList.join(', ').toUpperCase()}`);
+      await ctx.answerCbQuery(`Role ተቀይሯል: ${newRolesList.join(', ').toUpperCase()}`);
 
       // Refresh the role manage menu
       const isSales = newRolesList.includes('sales');
@@ -579,9 +579,9 @@ export function registerManagerHandlers(bot: Telegraf): void {
       const isFinance = newRolesList.includes('finance');
 
       const text =
-        `🔄 *Manage Roles for ${escapeMarkdown(updated.cleanName)}*\n\n` +
-        `Current Assigned Roles: *${newRolesList.map((r) => r.toUpperCase()).join(', ')}*\n\n` +
-        `Tap a role below to add or remove it from this staff member:`;
+        `🔄 *የ ${escapeMarkdown(updated.cleanName)} Role ማስተካከያ*\n\n` +
+        `የአሁን Roles: *${newRolesList.map((r) => r.toUpperCase()).join(', ')}*\n\n` +
+        `Role ለመጨመር ወይም ለማንሳት ከታች ያሉትን ይጫኑ:`;
 
       const buttons = [
         [
@@ -600,7 +600,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
             `team_toggle_${targetId}_finance`
           ),
         ],
-        [Markup.button.callback('⬅️ Back', `team_view_user_${targetId}`)],
+        [Markup.button.callback('⬅️ ተመለስ', `team_view_user_${targetId}`)],
       ];
 
       await ctx.editMessageText(text, {
@@ -609,7 +609,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
       });
     } catch (err: any) {
       console.error('[Manager] Error toggling role:', err);
-      await ctx.answerCbQuery('Database error updating role.', { show_alert: true });
+      await ctx.answerCbQuery('Role በመቀየር ላይ የ database ስህተት አጋጥሟል።', { show_alert: true });
     }
   });
 
@@ -624,7 +624,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
     try {
       const existing = await db.getUser(targetId);
       if (existing && (existing.role === 'manager' || existing.roles.includes('manager'))) {
-        await ctx.answerCbQuery('Manager has all access and cannot be changed.', { show_alert: true });
+        await ctx.answerCbQuery('Manager ሙሉ access ስላለው መቀየር አይቻልም።', { show_alert: true });
         return;
       }
 
@@ -638,46 +638,46 @@ export function registerManagerHandlers(bot: Telegraf): void {
         username,
       });
 
-      await ctx.answerCbQuery(`Role set to ${newRole.toUpperCase()}!`);
+      await ctx.answerCbQuery(`Role ወደ ${newRole.toUpperCase()} ተቀይሯል!`);
 
       // Notify the user in their private chat if their real Telegram ID is known
       if (targetId > 0) {
         try {
           await bot.telegram.sendMessage(
             targetId,
-            `ℹ️ *Role Updated*\n\n` +
-            `Manager *${manager.name}* updated your system role to: *${newRole.toUpperCase()}*.\n` +
-            `Send /start to refresh your menu.`,
+            `ℹ️ *የ Role ለውጥ*\n\n` +
+            `Manager *${manager.name}* የእርስዎን Role ወደ *${newRole.toUpperCase()}* ቀይረውታል።\n` +
+            `ዳሽቦርዱን ለማደስ /start ይጫኑ።`,
             { parse_mode: 'Markdown' }
           );
         } catch {}
       }
 
       // Return to user view
-      const usernameStr = updated.username ? `@${updated.username}` : 'None';
+      const usernameStr = updated.username ? `@${updated.username}` : 'የለም';
       const idDisplay =
         updated.telegram_id > 0
           ? `\`${updated.telegram_id}\``
-          : `_Pending_ (links automatically when user runs /start)`;
+          : `_Pending_ (/start ሲጫኑ በራሱ ይያያዛል)`;
 
       await ctx.editMessageText(
-        `✅ *Staff Member Added / Role Updated!*\n\n` +
-        `• *Name:* ${escapeMarkdown(updated.cleanName)}\n` +
+        `✅ *ሰራተኛው ተመዝግቧል / Role ተስተካክሏል!*\n\n` +
+        `• *ስም:* ${escapeMarkdown(updated.cleanName)}\n` +
         `• *Username:* ${escapeMarkdown(usernameStr)}\n` +
         `• *Telegram ID:* ${idDisplay}\n` +
-        `• *Assigned Roles:* *${updated.roles.map((r) => r.toUpperCase()).join(', ')}*\n\n` +
-        `Updated by ${manager.name} at ${formatTime(new Date())}`,
+        `• *የተሰጡ Roles:* *${updated.roles.map((r) => r.toUpperCase()).join(', ')}*\n\n` +
+        `የተስተካከለው በ ${manager.name} በ ${formatTime(new Date())}`,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('⬅️ Back to Staff List', 'team_list_all')],
+            [Markup.button.callback('⬅️ ወደ ሰራተኞች ዝርዝር', 'team_list_all')],
             [Markup.button.callback('👥 Team Dashboard', 'team_dashboard')],
           ]),
         }
       );
     } catch (err: any) {
       console.error('[Manager] Error assigning role:', err);
-      await ctx.answerCbQuery('Database error updating role.', { show_alert: true });
+      await ctx.answerCbQuery('Role በመመደብ ላይ የ database ስህተት አጋጥሟል።', { show_alert: true });
     }
   });
 
@@ -688,25 +688,25 @@ export function registerManagerHandlers(bot: Telegraf): void {
 
     const targetId = parseInt(ctx.match[1], 10);
     if (targetId === manager.telegram_id) {
-      await ctx.answerCbQuery('You cannot remove yourself.', { show_alert: true });
+      await ctx.answerCbQuery('ራስዎን ማስወገድ አይችሉም።', { show_alert: true });
       return;
     }
 
     const targetUser = await db.getUser(targetId);
     if (!targetUser) {
-      await ctx.answerCbQuery('User not found.', { show_alert: true });
+      await ctx.answerCbQuery('ተጠቃሚው አልተገኘም።', { show_alert: true });
       return;
     }
 
     const text =
-      `⚠️ *Confirm Removal*\n\n` +
-      `Are you sure you want to remove *${escapeMarkdown(targetUser.name)}* (\`${targetUser.telegram_id}\`)?\n` +
-      `They will immediately lose access to all bot features.`;
+      `⚠️ *የሰራተኛ ስረዛ ማረጋገጫ*\n\n` +
+      `እርግጠኛ ነዎት *${escapeMarkdown(targetUser.name)}* (\`${targetUser.telegram_id}\`) ከሲስተም እንዲወገድ ይፈልጋሉ?\n` +
+      `ሰራተኛው ወዲያውኑ የ bot access ያጣል።`;
 
     const buttons = [
       [
-        Markup.button.callback('🗑️ Yes, Remove Access', `team_do_remove_${targetId}`),
-        Markup.button.callback('⬅️ Cancel', `team_view_user_${targetId}`),
+        Markup.button.callback('🗑️ አዎ ሰርዝ (Yes, Remove)', `team_do_remove_${targetId}`),
+        Markup.button.callback('⬅️ ተመለስ (Cancel)', `team_view_user_${targetId}`),
       ],
     ];
 
@@ -725,21 +725,21 @@ export function registerManagerHandlers(bot: Telegraf): void {
     const targetId = parseInt(ctx.match[1], 10);
     try {
       await db.deleteUser(targetId);
-      await ctx.answerCbQuery('User removed.');
+      await ctx.answerCbQuery('ሰራተኛው ተሰርዟል።');
 
       await ctx.editMessageText(
-        `✅ *User Removed*\n\n` +
-        `Access for user with ID \`${targetId}\` has been revoked.`,
+        `✅ *ሰራተኛው ተሰርዟል*\n\n` +
+        `የ Telegram ID \`${targetId}\` ያለው ሰራተኛ access ተሰርዟል።`,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('⬅️ Back to Staff List', 'team_list_all')],
+            [Markup.button.callback('⬅️ ወደ ሰራተኞች ዝርዝር', 'team_list_all')],
           ]),
         }
       );
     } catch (err: any) {
       console.error('[Manager] Error removing user:', err);
-      await ctx.answerCbQuery('Failed to delete user.', { show_alert: true });
+      await ctx.answerCbQuery('ተጠቃሚውን በመሰረዝ ላይ ስህተት አጋጥሟል።', { show_alert: true });
     }
   });
 
@@ -759,16 +759,16 @@ export function registerManagerHandlers(bot: Telegraf): void {
     await ctx.answerCbQuery();
 
     const promptText =
-      `➕ <b>Add New Staff Member</b>\n\n` +
-      `Please reply with the employee's:\n` +
-      `• <b>Telegram Username</b> (e.g. <code>@dawit_t</code>)\n` +
-      `• OR <b>Numeric Telegram ID</b> (e.g. <code>987654321</code>)\n` +
-      `• OR both (e.g. <code>@dawit_t 987654321</code>)\n\n` +
-      `<i>(Optional: include their name, e.g. <code>@dawit_t Dawit Tadesse</code>)</i>\n\n` +
-      `Or use command: <code>/add_user @username &lt;role&gt; [name]</code>`;
+      `➕ <b>አዲስ ሰራተኛ መመዝገቢያ</b>\n\n` +
+      `እባክዎ የሰራተኛውን:\n` +
+      `• <b>Telegram Username</b> (ምሳሌ: <code>@dawit_t</code>)\n` +
+      `• ወይም <b>Telegram ID</b> (ምሳሌ: <code>987654321</code>)\n` +
+      `• ወይም ሁለቱንም (ምሳሌ: <code>@dawit_t 987654321</code>) ይላኩ\n\n` +
+      `<i>(አማራጭ: ስማቸውን ጨምረው መላክ ይችላሉ፣ ምሳሌ: <code>@dawit_t Dawit Tadesse</code>)</i>\n\n` +
+      `ወይም Command ይጠቀሙ: <code>/add_user @username &lt;role&gt; [name]</code>`;
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('⬅️ Cancel', 'team_dashboard')],
+      [Markup.button.callback('⬅️ ተመለስ (Cancel)', 'team_dashboard')],
     ]);
 
     try {
@@ -800,7 +800,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
     if (text.startsWith('/')) {
       if (text === '/cancel') {
         clearSession(ctx.from.id);
-        await ctx.reply('🔄 Add user cancelled.');
+        await ctx.reply('🔄 ሰራተኛ መመዝገብ ተሰርዟል።');
         return;
       }
       return next();
@@ -817,11 +817,11 @@ export function registerManagerHandlers(bot: Telegraf): void {
       } catch {}
 
       await ctx.reply(
-        `⚠️ Could not recognize a valid Telegram username or ID from: <code>${escapeMarkdown(text)}</code>\n\n` +
-        `Please send:\n` +
-        `• A username (e.g. <code>@dawit_t</code>)\n` +
-        `• An ID (e.g. <code>987654321</code>)\n\n` +
-        `<i>(Type /cancel to abort)</i>`,
+        `⚠️ የላኩት Username ወይም ID ትክክለኛ አይደለም: <code>${escapeMarkdown(text)}</code>\n\n` +
+        `እባክዎ እንደዚህ ይላኩ:\n` +
+        `• Username (ምሳሌ: <code>@dawit_t</code>)\n` +
+        `• ID (ምሳሌ: <code>987654321</code>)\n\n` +
+        `<i>(ለማቋረጥ /cancel ይበሉ)</i>`,
         { parse_mode: 'HTML' }
       );
       return;
@@ -845,14 +845,14 @@ export function registerManagerHandlers(bot: Telegraf): void {
     const idDisplay =
       resolved.id > 0
         ? `\`${resolved.id}\``
-        : `_Pending_ (will link automatically on /start)`;
+        : `_Pending_ (/start ሲጫኑ በራሱ ይያያዛል)`;
 
     const promptText =
-      `👤 *Staff Member Identified!*\n\n` +
-      `• *Name:* ${escapeMarkdown(resolved.name)}\n` +
-      `• *Username:* ${escapeMarkdown(resolved.username ? '@' + resolved.username : 'None')}\n` +
+      `👤 *ሰራተኛው ተለይቷል!*\n\n` +
+      `• *ስም:* ${escapeMarkdown(resolved.name)}\n` +
+      `• *Username:* ${escapeMarkdown(resolved.username ? '@' + resolved.username : 'የለም')}\n` +
       `• *Telegram ID:* ${idDisplay}\n\n` +
-      `👇 *Select their role to activate their account:*`;
+      `👇 *የሰራተኛውን Role ይምረጡ:*`;
 
     const buttons = [
       [
@@ -863,7 +863,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
         Markup.button.callback('💳 Finance Analyst', `team_assign_${resolved.id}_finance`),
         Markup.button.callback('👔 Manager', `team_assign_${resolved.id}_manager`),
       ],
-      [Markup.button.callback('⬅️ Cancel', 'team_dashboard')],
+      [Markup.button.callback('⬅️ ተመለስ (Cancel)', 'team_dashboard')],
     ];
 
     await ctx.reply(promptText, {
@@ -876,7 +876,7 @@ export function registerManagerHandlers(bot: Telegraf): void {
   bot.command('add_user', async (ctx) => {
     const user = await authenticateUser(ctx);
     if (!user || user.role !== 'manager') {
-      await ctx.reply('⛔ Only Managers can add users.');
+      await ctx.reply('⛔ ሰራተኛ መጨመር የሚችሉት Manager ብቻ ናቸው።');
       return;
     }
 
@@ -885,9 +885,9 @@ export function registerManagerHandlers(bot: Telegraf): void {
 
     if (parts.length < 3) {
       await ctx.reply(
-        `ℹ️ <b>Usage:</b> <code>/add_user &lt;@username_or_id&gt; &lt;role&gt; [name]</code>\n\n` +
+        `ℹ️ <b>አጠቃቀም:</b> <code>/add_user &lt;@username_or_id&gt; &lt;role&gt; [name]</code>\n\n` +
         `<b>Roles:</b> <code>sales</code>, <code>store</code>, <code>finance</code>, <code>manager</code>\n\n` +
-        `<b>Examples:</b>\n` +
+        `<b>ምሳሌዎች:</b>\n` +
         `• <code>/add_user @dawit_t sales Dawit Tadesse</code>\n` +
         `• <code>/add_user 987654321 store Abebe Kebede</code>`,
         { parse_mode: 'HTML' }
@@ -901,22 +901,22 @@ export function registerManagerHandlers(bot: Telegraf): void {
 
     const validRoles: UserRole[] = ['manager', 'store', 'finance', 'sales'];
     if (!validRoles.includes(roleArg)) {
-      await ctx.reply(`⚠️ Invalid role '${roleArg}'. Allowed: ${validRoles.join(', ')}`);
+      await ctx.reply(`⚠️ ትክክለኛ ያልሆነ role '${roleArg}'። የተፈቀዱ: ${validRoles.join(', ')}`);
       return;
     }
 
     const resolved = await resolveUserIdentity(bot, `${identifier} ${customName || ''}`);
     if (!resolved) {
       await ctx.reply(
-        `⚠️ Could not recognize username or Telegram ID for \`${identifier}\`.\n` +
-        `Please provide their username (@username) or numeric Telegram ID.`
+        `⚠️ ለ \`${identifier}\` ትክክለኛ Username ወይም Telegram ID ማግኘት አልተቻለም።\n` +
+        `እባክዎ Username (@username) ወይም Telegram ID በትክክል ይላኩ።`
       );
       return;
     }
 
     const existingTarget = await db.getUser(resolved.id);
     if (existingTarget && (existingTarget.role === 'manager' || existingTarget.roles.includes('manager'))) {
-      await ctx.reply('⛔ The Manager has all system permissions and cannot be reassigned to other roles.');
+      await ctx.reply('⛔ Manager ሙሉ የሲስተም access ስላለው ወደ ሌላ role መቀየር አይቻልም።');
       return;
     }
 
@@ -931,15 +931,15 @@ export function registerManagerHandlers(bot: Telegraf): void {
       const idDisplay =
         saved.telegram_id > 0
           ? `\`${saved.telegram_id}\``
-          : `_Pending_ (will link automatically on /start)`;
+          : `_Pending_ (/start ሲጫኑ በራሱ ይያያዛል)`;
 
       await ctx.reply(
-        `✅ *Staff Member Added & Activated!*\n\n` +
-        `👤 *Name:* ${escapeMarkdown(saved.name)}\n` +
-        `📱 *Username:* ${escapeMarkdown(saved.username ? '@' + saved.username : 'None')}\n` +
+        `✅ *ሰራተኛው ተመዝግቦ ተፈቅዷል!*\n\n` +
+        `👤 *ስም:* ${escapeMarkdown(saved.name)}\n` +
+        `📱 *Username:* ${escapeMarkdown(saved.username ? '@' + saved.username : 'የለም')}\n` +
         `🆔 *Telegram ID:* ${idDisplay}\n` +
         `🔑 *Role:* *${saved.role.toUpperCase()}*\n\n` +
-        `They can now message the bot directly with /start to begin.`,
+        `አሁን ሰራተኛው Bot-ቱን በ /start መጠቀም ይችላል።`,
         { parse_mode: 'Markdown' }
       );
 
@@ -947,14 +947,14 @@ export function registerManagerHandlers(bot: Telegraf): void {
         try {
           await bot.telegram.sendMessage(
             saved.telegram_id,
-            `🎉 *Welcome!*\n\nYou have been registered as *${roleArg.toUpperCase()}* by Manager ${user.name}.\nSend /start to open your dashboard.`,
+            `🎉 *እንኳን ደህና መጡ!*\n\nበ Manager ${user.name} እንደ *${roleArg.toUpperCase()}* ተመዝግበዋል።\nስራ ለመጀመር /start ይጫኑ።`,
             { parse_mode: 'Markdown' }
           );
         } catch {}
       }
     } catch (err: any) {
       console.error('[Manager] Error adding user:', err);
-      await ctx.reply(`⚠️ Failed to save user: ${err.message}`);
+      await ctx.reply(`⚠️ ሰራተኛውን መመዝገብ አልተቻለም: ${err.message}`);
     }
   });
 
@@ -962,13 +962,13 @@ export function registerManagerHandlers(bot: Telegraf): void {
   bot.command('remove_user', async (ctx) => {
     const user = await authenticateUser(ctx);
     if (!user || user.role !== 'manager') {
-      await ctx.reply('⛔ Only Managers can remove users.');
+      await ctx.reply('⛔ ሰራተኛ ማስወገድ የሚችሉት Manager ብቻ ናቸው።');
       return;
     }
 
     const parts = ctx.message.text.trim().split(/\s+/);
     if (parts.length < 2) {
-      await ctx.reply('ℹ️ Usage: `/remove_user <telegram_id_or_username>`', { parse_mode: 'Markdown' });
+      await ctx.reply('ℹ️ አጠቃቀም: `/remove_user <telegram_id_or_username>`', { parse_mode: 'Markdown' });
       return;
     }
 
@@ -986,22 +986,22 @@ export function registerManagerHandlers(bot: Telegraf): void {
     }
 
     if (isNaN(targetId) || targetId === user.telegram_id) {
-      await ctx.reply('⚠️ Invalid Telegram ID / Username or cannot remove yourself.');
+      await ctx.reply('⚠️ ትክክለኛ ያልሆነ ID/Username ነው ወይም ራስዎን ማስወገድ አይችሉም።');
       return;
     }
 
     const targetUser = await db.getUser(targetId);
     if (targetUser && (targetUser.role === 'manager' || targetUser.roles.includes('manager'))) {
-      await ctx.reply('⛔ Cannot remove a Manager.');
+      await ctx.reply('⛔ Manager-ን ማስወገድ አይቻልም።');
       return;
     }
 
     try {
       await db.deleteUser(targetId);
-      await ctx.reply(`✅ User \`${identifier}\` removed from the system.`, { parse_mode: 'Markdown' });
+      await ctx.reply(`✅ ተጠቃሚ \`${identifier}\` ከሲስተም ተወግዷል።`, { parse_mode: 'Markdown' });
     } catch (err: any) {
       console.error('[Manager] Error deleting user:', err);
-      await ctx.reply(`⚠️ Failed to remove user: ${err.message}`);
+      await ctx.reply(`⚠️ ተጠቃሚውን ማስወገድ አልተቻለም: ${err.message}`);
     }
   });
 }

@@ -13,12 +13,12 @@ export function registerStartHandlers(bot: Telegraf): void {
     const isManager = user.roles.includes('manager') || user.role === 'manager';
 
     if (!isManager && !user.roles.includes(chosenRole)) {
-      await ctx.answerCbQuery(`You are not assigned the ${chosenRole.toUpperCase()} role.`);
+      await ctx.answerCbQuery(`የ ${chosenRole.toUpperCase()} role አልተሰጠዎትም።`);
       return;
     }
 
     setActiveRole(user.telegram_id, chosenRole);
-    await ctx.answerCbQuery(`Switched active view to ${chosenRole.toUpperCase()}`);
+    await ctx.answerCbQuery(`ወደ ${chosenRole.toUpperCase()} ተቀይሯል`);
 
     // Refresh dashboard for the new active role
     await showRoleDashboard(ctx, { ...user, activeRole: chosenRole });
@@ -35,9 +35,9 @@ export function registerStartHandlers(bot: Telegraf): void {
     switch (user.activeRole) {
       case 'sales':
         roleDescription =
-          'You are active as a *Sales Representative*.\n' +
-          '• Use /new_order or tap the button below to create an order.\n' +
-          '• Use /my_orders to track status and submit payment slips.';
+          'እርስዎ በ *Sales Representative* view ውስጥ ነዎት።\n' +
+          '• አዲስ order ለመመዝገብ /new_order ይጠቀሙ ወይም ከታች ያለውን button ይጫኑ።\n' +
+          '• የ order ሁኔታዎችን ለመከታተልና የባንክ Payment Slip ለመላክ /my_orders ይጠቀሙ።';
         keyboardMarkup = Markup.keyboard([
           ['➕ New Order', '📋 My Orders'],
         ]).resize();
@@ -45,11 +45,11 @@ export function registerStartHandlers(bot: Telegraf): void {
 
       case 'manager':
         roleDescription =
-          'You are active as a *Manager* (Full System Access).\n' +
-          '• Authorize incoming requisitions in the #Orders channel/topic.\n' +
-          '• Audit and approve incoming payment slips (with full Finance access).\n' +
-          '• Open the *Team Management Dashboard* to add staff, manage roles, or revoke access.\n' +
-          '• As Manager, you have full privileges across Sales, Store, and Finance!';
+          'እርስዎ በ *Manager* (ሙሉ System Access) ውስጥ ነዎት።\n' +
+          '• በ #Orders topic ውስጥ የሚገቡ አዳዲስ order-ኦችን ያጽድቁ (Approve ያድርጉ)።\n' +
+          '• የተላኩትን Payment Slip-ኦች audit በማድረግ ያረጋግጡ (Confirm Paid)።\n' +
+          '• ሰራተኞችን ለማስተዳደርና Role ለመስጠት Team Dashboard ይጠቀሙ።\n' +
+          '• እንደ Manager በሁሉም የ Sales, Store እና Finance ክፍሎች ሙሉ access አለዎት!';
         keyboardMarkup = Markup.keyboard([
           ['👥 Manage Team', '💳 Pending Payments'],
         ]).resize();
@@ -61,17 +61,17 @@ export function registerStartHandlers(bot: Telegraf): void {
 
       case 'store':
         roleDescription =
-          'You are active as *Store Staff*.\n' +
-          '• Approved orders will arrive in the #Store channel/topic.\n' +
-          '• Reply directly to release notices with the signed receipt photo.';
+          'እርስዎ በ *Store Staff* view ውስጥ ነዎት።\n' +
+          '• Manager ያጸደቃቸው (Approved) order-ኦች በ #Store topic ይደርሳሉ።\n' +
+          '• ዕቃውን ሲያስረክቡ የተፈረመበትን Store Receipt በፎቶ መልእክቱን reply በማድረግ ይላኩ።';
         break;
 
       case 'finance':
         roleDescription =
-          'You are active as a *Finance Analyst*.\n' +
-          '• Dispatched orders with payment slips arrive in the #Finance channel/topic.\n' +
-          '• Verify payments against bank records and *Confirm Paid* or *Flag Discrepancy*.\n' +
-          '• Tap the button below or use /pending_payments to review payment slips.';
+          'እርስዎ በ *Finance Analyst* view ውስጥ ነዎት።\n' +
+          '• Payment Slip የተላከላቸው order-ኦች በ #Finance topic ይደርሳሉ።\n' +
+          '• የባንክ ሂሳቡን በማረጋገጥ *Confirm Paid* ወይም *Flag Discrepancy* ይጫኑ።\n' +
+          '• የተላኩትን ክፍያዎች ለማየት ከታች ያለውን button ወይም /pending_payments ይጠቀሙ።';
         keyboardMarkup = Markup.keyboard([
           ['💳 Pending Payments'],
         ]).resize();
@@ -104,15 +104,15 @@ export function registerStartHandlers(bot: Telegraf): void {
     }
 
     const assignedText = availableRoles.length > 1
-      ? `\n> 🔑 *Assigned Roles:* ${user.roles.map((r) => r.toUpperCase()).join(', ')}`
+      ? `\n> 🔑 *የተሰጡዎት Roles:* ${user.roles.map((r) => r.toUpperCase()).join(', ')}`
       : '';
 
     const greeting =
-      `👋 *Welcome, ${user.cleanName}!*\n\n` +
+      `👋 *እንኳን ደህና መጡ, ${user.cleanName}!*\n\n` +
       `> 🎯 *Active View:* *${user.activeRole.toUpperCase()}*` +
       assignedText +
       `\n\n${roleDescription}\n\n` +
-      `💡 _Type /help at any time for guidance or /cancel to reset actions._`;
+      `💡 _መመሪያዎችን ለማየት /help ወይም የጀመሩትን Action ለማቋረጥ /cancel ይጠቀሙ።_`;
 
     // Combine inline buttons
     const inlineRows: any[] = [];
@@ -135,7 +135,7 @@ export function registerStartHandlers(bot: Telegraf): void {
       });
       await ctx.reply(
         availableRoles.length > 1
-          ? '🔄 *Choose Role View / Actions:*'
+          ? '🔄 *የ Role ምርጫ / Actions:*'
           : '👉 *Actions:*',
         {
           parse_mode: 'Markdown',
@@ -165,33 +165,34 @@ export function registerStartHandlers(bot: Telegraf): void {
     if (!user) return;
 
     let helpText =
-      `📖 *System Help & Instructions*\n\n` +
-      `👤 *User:* ${user.name}\n` +
-      `🔑 *Role:* ${user.role.toUpperCase()}\n\n`;
+      `📖 *የሲስተም መመሪያዎች (Help & Instructions)*\n\n` +
+      `> 👤 *ስም:* ${user.name}\n` +
+      `> 🔑 *Active Role:* ${user.role.toUpperCase()}\n\n`;
 
     if (user.role === 'sales') {
       helpText +=
-        `*Sales Commands (Private Chat Only):*\n` +
-        `• /new_order — Create and submit a new client order\n` +
-        `• /my_orders — List your orders and submit payment slips\n` +
-        `• /cancel — Cancel ongoing order creation or upload\n`;
+        `*የ Sales ትእዛዞች (በ Bot የግል ቻት ብቻ):*\n` +
+        `• /new_order — አዲስ የደንበኛ order መመዝገብ\n` +
+        `• /my_orders — የእርስዎን order-ኦች ማየትና Payment Slip መላክ\n` +
+        `• /cancel — የጀመሩትን order ወይም slip መላኪያ ማቋረጥ\n`;
     } else if (user.role === 'manager') {
       helpText +=
-        `*Manager Actions:*\n` +
-        `• Monitor the #Orders topic for new requisitions\n` +
-        `• Tap *Approve* to release to the store or *Reject* to cancel\n` +
-        `• /manage_team or tap '👥 Manage Team' to view staff, assign roles by @username, or revoke access\n`;
+        `*የ Manager ስራዎች:*\n` +
+        `• በ #Orders topic ውስጥ የሚገቡ አዳዲስ order-ኦችን *Approve* ወይም *Reject* ማድረግ\n` +
+        `• /manage_team ወይም '👥 Manage Team' በመጫን ሰራተኞችን ማስተዳደርና role መስጠት\n` +
+        `• /pending_payments በመጠቀም ያልተረጋገጡ የባንክ ክፍያዎችን audit ማድረግ\n`;
     } else if (user.role === 'store') {
       helpText +=
-        `*Store Actions:*\n` +
-        `• Monitor the #Store topic for approved releases\n` +
-        `• Reply directly to release notices with a signed receipt photo\n` +
-        `• The bot automatically delivers the receipt privately to the sales rep\n`;
+        `*የ Store ስራዎች:*\n` +
+        `• በ #Store topic የተፈቀዱ order-ኦችን መከታተል\n` +
+        `• ዕቃው ሲወጣ የተፈረመበትን Store Receipt ፎቶ መልእክቱን reply በማድረግ መላክ\n` +
+        `• bot-ቱ ደረሰኙን ወዲያውኑ ለ Sales Rep በግል ይልካል\n`;
     } else if (user.role === 'finance') {
       helpText +=
-        `*Finance Actions:*\n` +
-        `• Monitor the #Finance topic for payment slips\n` +
-        `• Audit bank transactions and tap *Confirm Paid* or *Flag Discrepancy*\n`;
+        `*የ Finance ስራዎች:*\n` +
+        `• በ #Finance topic የሚገቡ የባንክ Payment Slip-ኦችን መከታተል\n` +
+        `• የባንክ ሂሳቡን በማረጋገጥ *Confirm Paid* ወይም *Flag Discrepancy* መጫን\n` +
+        `• /pending_payments በማለት የሚጠብቁ ክፍያዎችን ማየት\n`;
     }
 
     await ctx.reply(helpText, { parse_mode: 'Markdown' });
@@ -202,6 +203,6 @@ export function registerStartHandlers(bot: Telegraf): void {
     if (ctx.from?.id) {
       clearSession(ctx.from.id);
     }
-    await ctx.reply('🔄 Current action cancelled. Returning to main menu.');
+    await ctx.reply('🔄 የተጀመረው Action ተሰርዟል። ወደ ዋናው Menu ተመልሰዋል።');
   });
 }
