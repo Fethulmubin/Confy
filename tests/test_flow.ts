@@ -188,4 +188,19 @@ const extractedExpense = extractStoreExpenseHistory(rawItemsWithExpense);
 assert(extractedExpense !== null && extractedExpense.includes('Truck: 300'), 'Manager history extracts dispatch expense note');
 console.log('✅ Sales privacy and manager history extraction tests passed.');
 
+// Test 8: Order ID extraction from Amharic and English messages & captions
+console.log('Test 8: Order ID extraction from messages and captions');
+const { extractOrderId } = require('../src/utils');
+
+assert(extractOrderId('📦 *ኦርደር #12 — እንዲወጣ ተፈቅዷል*') === 12, 'Extracts from Amharic store release title');
+assert(extractOrderId('📦 *Order #45 — Approved for Release*') === 45, 'Extracts from English release title');
+assert(extractOrderId('ኦርደር 99') === 99, 'Extracts from "ኦርደር 99"');
+assert(extractOrderId('ኦርደር#77') === 77, 'Extracts from "ኦርደር#77"');
+assert(extractOrderId('#88') === 88, 'Extracts from "#88"');
+assert(extractOrderId('Order 101') === 101, 'Extracts from "Order 101"');
+assert(extractOrderId('Order #102') === 102, 'Extracts from "Order #102"');
+assert(extractOrderId('Just a photo without order') === null, 'Returns null when no order id');
+console.log('✅ Order ID extraction tests passed.');
+
 console.log('🎉 All unit and logic tests passed successfully!');
+

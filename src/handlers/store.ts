@@ -1,12 +1,13 @@
 import { Telegraf } from 'telegraf';
 import { db } from '../supabase';
 import { config } from '../config';
-import { escapeMarkdown, formatCurrency, cleanItemDetailsForSales } from '../utils';
+import { authenticateUser } from '../middleware/auth';
+import { escapeMarkdown, formatCurrency, cleanItemDetailsForSales, extractOrderId } from '../utils';
 
 export function registerStoreHandlers(bot: Telegraf): void {
-  // Store receipt photo upload handler in group/topic
-  bot.on('photo', async (ctx, next) => {
-    // Only handle group/supergroup photo messages for store fulfillment
+  // Store receipt photo or document upload handler in group/topic
+  bot.on(['photo', 'document'], async (ctx, next) => {
+    // Only handle group/supergroup messages for store fulfillment
     if (ctx.chat.type === 'private') {
       return next(); // Pass to sales handler
     }
@@ -14,35 +15,54 @@ export function registerStoreHandlers(bot: Telegraf): void {
     const message = ctx.message;
     const replyMsg = message.reply_to_message;
 
-    // Check if replying to an "Order #X — Approved for Release" message
+    // 1. Check if replying to an order message
     let orderId: number | null = null;
 
     if (replyMsg && ('text' in replyMsg || 'caption' in replyMsg)) {
-      const sourceText = ('text' in replyMsg ? replyMsg.text : replyMsg.caption) || '';
-      const match = sourceText.match(/Order #(\d+)/i);
-      if (match) {
-        orderId = parseInt(match[1], 10);
-      }
+      const sourceText = ('text' in replyMsg ? replyMsg.text : ('caption' in replyMsg ? replyMsg.caption : '')) || '';
+      orderId = extractOrderId(sourceText);
     }
 
-    // Fallback: check photo caption for Order #ID
+    // 2. Fallback: check photo/document caption for Order #ID
     if (!orderId && message.caption) {
-      const match = message.caption.match(/(?:Order\s*#?|#)(\d+)/i);
-      if (match) {
-        orderId = parseInt(match[1], 10);
+      orderId = extractOrderId(message.caption);
+    }
+
+    // 3. Fallback: If posted in Store topic without explicit reply or caption, check active pending orders
+    const isStoreChat =
+      String(ctx.chat.id) === String(config.storeChatId) &&
+      (!config.storeThreadId || ctx.message.message_thread_id === config.storeThreadId);
+
+    if (!orderId && isStoreChat) {
+      try {
+        const pending = await db.getOrdersByStatus('pending_dispatch', 5);
+        if (pending.length === 1) {
+          orderId = pending[0].id;
+        } else if (pending.length > 1) {
+          await ctx.reply(
+            `⚠️ እባክዎ ደረሰኙ ለየትኛው ኦርደር እንደሆነ ለመለየት የሚመለከተውን የኦርደር መልእክት reply ያድርጉ ወይም በፎቶው caption ላይ 'ኦርደር #ቁጥር' ይጥቀሱ።\n\n` +
+            `📦 *ከስቶር እንዲወጡ የተፈቀዱ ኦርደሮች:*\n` +
+            pending.map((o) => `• ኦርደር #${o.id} (${escapeMarkdown(o.client_name)})`).join('\n'),
+            {
+              parse_mode: 'Markdown',
+              reply_parameters: { message_id: message.message_id },
+            }
+          );
+          return;
+        }
+      } catch (e) {
+        console.warn('[Store] Error checking pending orders fallback:', e);
       }
     }
 
-    // If this photo is not related to store fulfillment, pass to next middleware
+    // If this message is not related to store fulfillment, pass to next middleware
     if (!orderId) {
       return next();
     }
 
-    const telegramId = ctx.from.id;
-
     try {
       // 1. Role verification: must have 'store' or 'manager' role
-      const user = await db.getUser(telegramId);
+      const user = await authenticateUser(ctx);
       const isAuthorized =
         user &&
         (user.roles.includes('store') ||
@@ -52,7 +72,7 @@ export function registerStoreHandlers(bot: Telegraf): void {
 
       if (!isAuthorized) {
         await ctx.reply(
-          `🚫 አልተፈቀደም: Telegram ID ${telegramId} ለስቶር ስራዎች የተፈቀደለት አይደለም።`,
+          `🚫 አልተፈቀደም: @${ctx.from.username || ctx.from.id} ለስቶር ስራዎች የተፈቀደለት አይደለም።`,
           { reply_parameters: { message_id: message.message_id } }
         );
         return;
@@ -75,15 +95,29 @@ export function registerStoreHandlers(bot: Telegraf): void {
         return;
       }
 
-      // 3. Capture native Telegram file_id and optional delivery/labour expenses from caption
-      const photo = message.photo[message.photo.length - 1];
-      const receiptFileId = photo.file_id;
+      // 3. Capture native Telegram file_id from photo or document
+      let receiptFileId: string | null = null;
+      if ('photo' in message && message.photo && message.photo.length > 0) {
+        receiptFileId = message.photo[message.photo.length - 1].file_id;
+      } else if ('document' in message && message.document) {
+        receiptFileId = message.document.file_id;
+      }
+
+      if (!receiptFileId) {
+        await ctx.reply(`⚠️ እባክዎ የደረሰኙን ፎቶ ወይም ሰነድ በትክክል ይላኩ።`, {
+          reply_parameters: { message_id: message.message_id },
+        });
+        return;
+      }
+
       const captionText = message.caption || '';
 
       // Check if store staff provided delivery / truck / labour expenses in caption
       // e.g., "Truck: 300, Labour: 150" or "+450 delivery" or "ጭነት 300 ጉልበት 150"
       let extraExpense: { amount: number; note: string } | undefined = undefined;
-      const expenseMatches = captionText.matchAll(/(?:truck|labour|labor|transport|delivery|fee|exp|extra|\+|ጭነት|ጉልበት)\s*[:=-]?\s*(\d+(?:\.\d+)?)/gi);
+      const expenseMatches = captionText.matchAll(
+        /(?:truck|labour|labor|transport|delivery|fee|exp|extra|\+|ጭነት|ጉልበት|የጭነት|የጉልበት|ትራንስፖርት|መጓጓዣ)\s*[:=-]?\s*(\d+(?:\.\d+)?)/gi
+      );
       let totalExtra = 0;
       const notes: string[] = [];
 
@@ -185,4 +219,39 @@ export function registerStoreHandlers(bot: Telegraf): void {
       });
     }
   });
+
+  // Guide store staff if they reply with plain text instead of photo/document
+  bot.on('text', async (ctx, next) => {
+    if (ctx.chat.type === 'private') return next();
+
+    const message = ctx.message;
+    const replyMsg = message.reply_to_message;
+    if (!replyMsg) return next();
+
+    const sourceText = ('text' in replyMsg ? replyMsg.text : ('caption' in replyMsg ? replyMsg.caption : '')) || '';
+    const orderId = extractOrderId(sourceText);
+    if (!orderId) return next();
+
+    // Check if the replied message is a store release notice
+    if (
+      sourceText.includes('እንዲወጣ ተፈቅዷል') ||
+      sourceText.includes('Approved for Release') ||
+      sourceText.includes('ስቶር ደረሰኝ') ||
+      sourceText.includes('Store Receipt')
+    ) {
+      await ctx.reply(
+        `📸 *የስቶር ደረሰኝ ለመመዝገብ እባክዎ ፎቶ (Photo) ይላኩ*\n\n` +
+        `ለኦርደር #${orderId} የተፈረመበትን ደረሰኝ በፎቶ መልክ ይላኩ (ይህን መልእክት reply በማድረግ)።\n` +
+        `💡 _ማስታወሻ: የጭነት ወይም የጉልበት ወጪ ካለ በፎቶው caption ላይ ይጥቀሱ (ምሳሌ: \`ጭነት: 300, ጉልበት: 150\`)።_`,
+        {
+          parse_mode: 'Markdown',
+          reply_parameters: { message_id: message.message_id },
+        }
+      );
+      return;
+    }
+
+    return next();
+  });
 }
+

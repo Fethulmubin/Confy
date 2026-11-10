@@ -3,7 +3,7 @@ import { db } from '../supabase';
 import { config } from '../config';
 import { authenticateUser } from '../middleware/auth';
 import { getSession, setSession, clearSession } from '../state';
-import { escapeMarkdown, formatCurrency, getStatusBadge, cleanItemDetailsForSales, extractStoreExpenseHistory } from '../utils';
+import { escapeMarkdown, formatCurrency, getStatusBadge, cleanItemDetailsForSales, extractStoreExpenseHistory, extractOrderId } from '../utils';
 
 export function registerSalesHandlers(bot: Telegraf): void {
   // Guard helper for 1-on-1 private chat
@@ -343,11 +343,7 @@ export function registerSalesHandlers(bot: Telegraf): void {
     if (session && session.type === 'upload_slip') {
       targetOrderId = session.orderId;
     } else if (ctx.message.caption) {
-      // Check if order ID is specified in caption, e.g. #104 or 104
-      const match = ctx.message.caption.match(/(?:Order\s*#?|#)(\d+)/i);
-      if (match) {
-        targetOrderId = parseInt(match[1], 10);
-      }
+      targetOrderId = extractOrderId(ctx.message.caption);
     }
 
     // If still not specified, check if the sales rep has exactly one dispatched order

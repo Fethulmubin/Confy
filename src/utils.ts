@@ -64,3 +64,19 @@ export function extractStoreExpenseHistory(text: string | null | undefined): str
   const match = text.match(/\[(?:Store Paid Dispatch|\+ Dispatch Expense):\s*(.*?)\]/i);
   return match ? match[1] : null;
 }
+
+/**
+ * Extracts order numeric ID from text containing variations like:
+ * "ኦርደር #123", "Order #123", "ኦርደር 123", "Order 123", "ኦርደር#123", "#123"
+ */
+export function extractOrderId(text: string | null | undefined): number | null {
+  if (!text) return null;
+  const m1 = text.match(/(?:Order|ኦርደር)\s*#?\s*(\d+)/i);
+  if (m1) return parseInt(m1[1], 10);
+
+  const m2 = text.match(/#(\d+)/);
+  if (m2) return parseInt(m2[1], 10);
+
+  return null;
+}
+
