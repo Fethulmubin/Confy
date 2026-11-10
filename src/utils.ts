@@ -32,17 +32,17 @@ export function formatTime(date: Date = new Date()): string {
 export function getStatusBadge(status: OrderStatus): string {
   switch (status) {
     case 'pending_approval':
-      return '⏳ የ Manager Approval በመጠበቅ ላይ';
+      return '⏳ የማናጀር ማረጋገጫ በመጠበቅ ላይ';
     case 'pending_dispatch':
-      return '📦 Approved ሆኗል (Store Dispatch በመጠበቅ ላይ)';
+      return '📦 ጸድቋል (ከስቶር መውጣት በመጠበቅ ላይ)';
     case 'dispatched':
-      return '🚚 Dispatched ሆኗል (Payment Slip በመጠበቅ ላይ)';
+      return '🚚 ከስቶር ወጥቷል (ስሊፕ በመጠበቅ ላይ)';
     case 'pending_audit':
-      return '🔍 Payment Slip ገብቷል (Finance Audit ላይ)';
+      return '🔍 ስሊፕ ገብቷል (ፋይናንስ ማረጋገጥ አለበት)';
     case 'completed':
-      return '✅ Completed (ተጠናቋል)';
+      return '✅ ተጠናቋል';
     case 'cancelled':
-      return '❌ Cancelled (ተሰርዟል)';
+      return '❌ ተሰርዟል';
     default:
       return status;
   }

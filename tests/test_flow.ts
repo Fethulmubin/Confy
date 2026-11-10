@@ -16,12 +16,12 @@ assert(formatCurrency(12500) === '12,500 ETB', 'Currency formatting 12500');
 assert(formatCurrency(0) === '0 ETB', 'Currency formatting 0');
 assert(escapeMarkdown('Order #104 [Test]') === 'Order #104 \\[Test\\]', 'Escape markdown [');
 assert(escapeMarkdown('Hello *World* _foo_ `bar`') === 'Hello \\*World\\* \\_foo\\_ \\`bar\\`', 'Escape markdown symbols');
-assert(getStatusBadge('pending_approval').includes('Manager Approval'), 'Status badge pending_approval');
-assert(getStatusBadge('pending_dispatch').includes('Store Dispatch'), 'Status badge pending_dispatch');
-assert(getStatusBadge('dispatched').includes('Dispatched'), 'Status badge dispatched');
-assert(getStatusBadge('pending_audit').includes('Finance Audit'), 'Status badge pending_audit');
-assert(getStatusBadge('completed').includes('Completed'), 'Status badge completed');
-assert(getStatusBadge('cancelled').includes('Cancelled'), 'Status badge cancelled');
+assert(getStatusBadge('pending_approval').includes('ማናጀር'), 'Status badge pending_approval');
+assert(getStatusBadge('pending_dispatch').includes('ስቶር'), 'Status badge pending_dispatch');
+assert(getStatusBadge('dispatched').includes('ስሊፕ'), 'Status badge dispatched');
+assert(getStatusBadge('pending_audit').includes('ፋይናንስ'), 'Status badge pending_audit');
+assert(getStatusBadge('completed').includes('ተጠናቋል'), 'Status badge completed');
+assert(getStatusBadge('cancelled').includes('ተሰርዟል'), 'Status badge cancelled');
 console.log('✅ Utils tests passed.');
 
 // Test 2: State management

@@ -43,16 +43,16 @@ export async function authenticateUser(ctx: Context): Promise<User | null> {
     if (!user) {
       const usernameText = username ? `@${username}` : 'የለውም';
       const deniedMessage =
-        `⛔ *Access አልተፈቀደም (Access Denied)*\n\n` +
+        `⛔ *አልተፈቀደም (Access Denied)*\n\n` +
         `> 👤 *ስም:* ${escapeMarkdown(rawName)}\n` +
         `> 📱 *Username:* ${escapeMarkdown(usernameText)}\n` +
         `> 🆔 *Telegram ID:* \`${telegramId}\`\n\n` +
-        `በሲስተሙ ውስጥ አልተመዘገቡም። እባክዎ Manager access እስኪሰጥዎት ይጠብቁ።\n` +
-        `የ Access ጥያቄ ወደ Management ተልኳል።`;
+        `በሲስተሙ ውስጥ አልተመዘገቡም። እባክዎ ማናጀሩ ፈቃድ እስኪሰጥዎት ይጠብቁ።\n` +
+        `የፈቃድ ጥያቄ ወደ ማናጀር ተልኳል።`;
 
       if (ctx.callbackQuery) {
         await ctx.answerCbQuery(
-          `Access አልተፈቀደም: የእርስዎ Telegram ID (${telegramId}) አልተመዘገበም።`,
+          `አልተፈቀደም: የእርስዎ Telegram ID (${telegramId}) አልተመዘገበም።`,
           { show_alert: true }
         );
       } else {
@@ -63,23 +63,23 @@ export async function authenticateUser(ctx: Context): Promise<User | null> {
           try {
             await ctx.telegram.sendMessage(
               config.ordersChatId,
-              `🔔 *አዲስ የ Access ጥያቄ*\n\n` +
+              `🔔 *አዲስ የፈቃድ ጥያቄ*\n\n` +
               `> 👤 *ስም:* ${escapeMarkdown(rawName)}\n` +
-              `> 📱 *Username:* ${username ? `@${escapeMarkdown(username)}` : 'None'}\n` +
+              `> 📱 *Username:* ${username ? `@${escapeMarkdown(username)}` : 'የለም'}\n` +
               `> 🆔 *Telegram ID:* \`${telegramId}\`\n\n` +
-              `Role ለመስጠት እና Approve ለማድረግ ከታች ይጫኑ:`,
+              `ሚና መርጠው ለማጽደቅ ከታች ይጫኑ:`,
               {
                 parse_mode: 'Markdown',
                 message_thread_id: config.ordersThreadId,
                 reply_markup: {
                   inline_keyboard: [
                     [
-                      { text: '💼 Sales Rep', callback_data: `grant_role_${telegramId}_sales` },
-                      { text: '📦 Store Staff', callback_data: `grant_role_${telegramId}_store` },
+                      { text: '💼 ሴልስ', callback_data: `grant_role_${telegramId}_sales` },
+                      { text: '📦 ስቶር', callback_data: `grant_role_${telegramId}_store` },
                     ],
                     [
-                      { text: '💳 Finance Analyst', callback_data: `grant_role_${telegramId}_finance` },
-                      { text: '👔 Manager', callback_data: `grant_role_${telegramId}_manager` },
+                      { text: '💳 ፋይናንስ', callback_data: `grant_role_${telegramId}_finance` },
+                      { text: '👔 ማናጀር', callback_data: `grant_role_${telegramId}_manager` },
                     ],
                   ],
                 },
@@ -151,7 +151,7 @@ export async function checkCallbackRole(
 
     if (!user) {
       await ctx.answerCbQuery(
-        `Access አልተፈቀደም: Telegram ID ${telegramId} አልተመዘገበም።`,
+        `አልተፈቀደም: Telegram ID ${telegramId} አልተመዘገበም።`,
         { show_alert: true }
       );
       return null;
@@ -162,9 +162,16 @@ export async function checkCallbackRole(
     const hasRole = allowedRoles.some((r) => user!.roles.includes(r) || user!.activeRole === r);
 
     if (!isManager && !hasRole) {
-      const rolesStr = allowedRoles.map((r) => r.toUpperCase()).join(' ወይም ');
+      const roleMap: Record<string, string> = {
+        sales: 'ሴልስ',
+        store: 'ስቶር',
+        finance: 'ፋይናንስ',
+        manager: 'ማናጀር',
+      };
+      const rolesStr = allowedRoles.map((r) => roleMap[r] || r).join(' ወይም ');
+      const userRoleStr = roleMap[user.activeRole] || user.activeRole;
       await ctx.answerCbQuery(
-        `ይህ Action ለ ${rolesStr} ብቻ የተፈቀደ ነው። የእርስዎ Active Role ${user.activeRole.toUpperCase()} ነው።`,
+        `ይህ ተግባር ለ ${rolesStr} ብቻ የተፈቀደ ነው። የእርስዎ ሚና ${userRoleStr} ነው።`,
         { show_alert: true }
       );
       return null;

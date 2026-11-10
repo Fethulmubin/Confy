@@ -52,7 +52,7 @@ export function registerStoreHandlers(bot: Telegraf): void {
 
       if (!isAuthorized) {
         await ctx.reply(
-          `🚫 Access አልተፈቀደም: Telegram ID ${telegramId} ለ Store ስራዎች የተፈቀደለት አይደለም።`,
+          `🚫 አልተፈቀደም: Telegram ID ${telegramId} ለስቶር ስራዎች የተፈቀደለት አይደለም።`,
           { reply_parameters: { message_id: message.message_id } }
         );
         return;
@@ -61,7 +61,7 @@ export function registerStoreHandlers(bot: Telegraf): void {
       // 2. Fetch and validate order status
       const order = await db.getOrder(orderId);
       if (!order) {
-        await ctx.reply(`Order #${orderId} በሲስተሙ ውስጥ አልተገኘም።`, {
+        await ctx.reply(`ኦርደር #${orderId} በሲስተሙ ውስጥ አልተገኘም።`, {
           reply_parameters: { message_id: message.message_id },
         });
         return;
@@ -69,7 +69,7 @@ export function registerStoreHandlers(bot: Telegraf): void {
 
       if (order.status !== 'pending_dispatch') {
         await ctx.reply(
-          `⚠️ የ Order #${orderId} status '${order.status}' ስለሆነ Dispatch ማድረግ አይቻልም።`,
+          `⚠️ የኦርደር #${orderId} ሁኔታ '${order.status}' ስለሆነ ከስቶር ማውጣት አይቻልም።`,
           { reply_parameters: { message_id: message.message_id } }
         );
         return;
@@ -98,7 +98,7 @@ export function registerStoreHandlers(bot: Telegraf): void {
       if (totalExtra > 0) {
         extraExpense = {
           amount: totalExtra,
-          note: notes.join(', ') || `Delivery & Labour (${totalExtra} ETB)`,
+          note: notes.join(', ') || `ጭነት እና ጉልበት (${totalExtra} ETB)`,
         };
       }
 
@@ -111,11 +111,11 @@ export function registerStoreHandlers(bot: Telegraf): void {
         : '';
 
       await ctx.reply(
-        `✅ *Order #${orderId} Dispatched ሆኗል*\n\n` +
-        `> 👤 *Client:* ${escapeMarkdown(order.client_name)}\n` +
-        `> 📦 *Status:* Store Receipt ተመዝግቧል` +
+        `✅ *ኦርደር #${orderId} ከስቶር ወጥቷል*\n\n` +
+        `> 👤 *ደንበኛ:* ${escapeMarkdown(order.client_name)}\n` +
+        `> 📦 *ሁኔታ:* ደረሰኝ ተመዝግቧል` +
         expenseNotice +
-        `\n\n📨 _የ Store Release Receipt ለ Sales Representative በግል ተልኳል።_`,
+        `\n\n📨 _የተፈረመበት ደረሰኝ ለሴልስ ሬፕ በግል ተልኳል።_`,
         {
           parse_mode: 'Markdown',
           reply_parameters: { message_id: message.message_id },
@@ -127,11 +127,11 @@ export function registerStoreHandlers(bot: Telegraf): void {
         try {
           await bot.telegram.sendMessage(
             config.ordersChatId,
-            `🚚 *Store Dispatch Expense Logged*\n\n` +
-            `> 🆔 *Order:* #${updatedOrder.id}\n` +
-            `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
-            `> 💵 *Paid by Store Staff:* ${formatCurrency(extraExpense.amount)}\n` +
-            `> 📝 *Details:* ${escapeMarkdown(extraExpense.note)}`,
+            `🚚 *የስቶር ጭነት/ጉልበት ወጪ መዝገብ*\n\n` +
+            `> 🆔 *ኦርደር:* #${updatedOrder.id}\n` +
+            `> 👤 *ደንበኛ:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
+            `> 💵 *በስቶር የተከፈለ:* ${formatCurrency(extraExpense.amount)}\n` +
+            `> 📝 *ዝርዝር:* ${escapeMarkdown(extraExpense.note)}`,
             {
               parse_mode: 'Markdown',
               message_thread_id: config.ordersThreadId,
@@ -152,19 +152,19 @@ export function registerStoreHandlers(bot: Telegraf): void {
           receiptFileId,
           {
             caption:
-              `📦 *Store Release Receipt: Order #${updatedOrder.id}*\n\n` +
-              `> 👤 *Client:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
-              `> 📋 *Items:* ${escapeMarkdown(salesItems)}\n` +
+              `📦 *የተፈረመ ደረሰኝ: ኦርደር #${updatedOrder.id}*\n\n` +
+              `> 👤 *ደንበኛ:* ${escapeMarkdown(updatedOrder.client_name)}\n` +
+              `> 📋 *ዕቃዎች:* ${escapeMarkdown(salesItems)}\n` +
               `> 💰 *የሚሰበሰብ ጠቅላላ ዋጋ:* *${formatCurrency(updatedOrder.total_amount)}*\n` +
-              `> 📦 *Status:* Dispatched & Ready\n\n` +
-              `📎 *የተፈረመበት የ Store Release Receipt ከላይ ተያይዟል።*\n\n` +
-              `👉 እባክዎ ደንበኛው የከፈለበትን የባንክ Payment Slip ከታች ይላኩ:`,
+              `> 📦 *ሁኔታ:* ከስቶር ወጥቷል\n\n` +
+              `📎 *የተፈረመበት ደረሰኝ ከላይ ተያይዟል።*\n\n` +
+              `👉 እባክዎ ደንበኛው የከፈለበትን የባንክ ስሊፕ ከታች ይላኩ:`,
             parse_mode: 'Markdown',
             reply_markup: {
               inline_keyboard: [
                 [
                   {
-                    text: `💳 የ #${updatedOrder.id} Payment Slip ላክ`,
+                    text: `💳 ስሊፕ ላክ`,
                     callback_data: `start_slip_${updatedOrder.id}`,
                   },
                 ],
@@ -180,7 +180,7 @@ export function registerStoreHandlers(bot: Telegraf): void {
       }
     } catch (err: any) {
       console.error(`[Store] Error handling receipt photo for order #${orderId}:`, err);
-      await ctx.reply(`⚠️ Store Receipt በማስቀመጥ ላይ ችግር ተፈጥሯል (Order #${orderId}).`, {
+      await ctx.reply(`⚠️ ደረሰኝ በማስቀመጥ ላይ ችግር ተፈጥሯል (ኦርደር #${orderId})።`, {
         reply_parameters: { message_id: message.message_id },
       });
     }

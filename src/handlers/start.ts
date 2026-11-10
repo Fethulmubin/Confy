@@ -4,6 +4,13 @@ import { clearSession, setActiveRole } from '../state';
 import { UserRole } from '../types';
 
 export function registerStartHandlers(bot: Telegraf): void {
+  const roleLabels: Record<UserRole, string> = {
+    manager: '👔 ማናጀር',
+    sales: '💼 ሴልስ',
+    store: '📦 ስቶር',
+    finance: '💳 ፋይናንስ',
+  };
+
   // Callback: Switch active role
   bot.action(/^switch_role_([a-z]+)$/, async (ctx) => {
     const user = await authenticateUser(ctx);
@@ -13,12 +20,12 @@ export function registerStartHandlers(bot: Telegraf): void {
     const isManager = user.roles.includes('manager') || user.role === 'manager';
 
     if (!isManager && !user.roles.includes(chosenRole)) {
-      await ctx.answerCbQuery(`የ ${chosenRole.toUpperCase()} role አልተሰጠዎትም።`);
+      await ctx.answerCbQuery(`የ ${roleLabels[chosenRole] || chosenRole} ፈቃድ አልተሰጠዎትም።`);
       return;
     }
 
     setActiveRole(user.telegram_id, chosenRole);
-    await ctx.answerCbQuery(`ወደ ${chosenRole.toUpperCase()} ተቀይሯል`);
+    await ctx.answerCbQuery(`ወደ ${roleLabels[chosenRole] || chosenRole} ተቀይሯል`);
 
     // Refresh dashboard for the new active role
     await showRoleDashboard(ctx, { ...user, activeRole: chosenRole });
@@ -35,48 +42,48 @@ export function registerStartHandlers(bot: Telegraf): void {
     switch (user.activeRole) {
       case 'sales':
         roleDescription =
-          'እርስዎ በ *Sales Representative* view ውስጥ ነዎት።\n' +
-          '• አዲስ order ለመመዝገብ /new_order ይጠቀሙ ወይም ከታች ያለውን button ይጫኑ።\n' +
-          '• የ order ሁኔታዎችን ለመከታተልና የባንክ Payment Slip ለመላክ /my_orders ይጠቀሙ።';
+          'እርስዎ በ *ሴልስ* ክፍል ውስጥ ነዎት።\n' +
+          '• አዲስ ኦርደር ለመመዝገብ /new_order ይጠቀሙ ወይም ከታች ያለውን አዝራር ይጫኑ።\n' +
+          '• የኦርደር ሁኔታዎችን ለመከታተልና የባንክ ስሊፕ ለመላክ /my_orders ይጠቀሙ።';
         keyboardMarkup = Markup.keyboard([
-          ['➕ New Order', '📋 My Orders'],
+          ['➕ አዲስ ኦርደር', '📋 የኔ ኦርደሮች'],
         ]).resize();
         break;
 
       case 'manager':
         roleDescription =
-          'እርስዎ በ *Manager* (ሙሉ System Access) ውስጥ ነዎት።\n' +
-          '• በ #Orders topic ውስጥ የሚገቡ አዳዲስ order-ኦችን ያጽድቁ (Approve ያድርጉ)።\n' +
-          '• የተላኩትን Payment Slip-ኦች audit በማድረግ ያረጋግጡ (Confirm Paid)።\n' +
-          '• ሰራተኞችን ለማስተዳደርና Role ለመስጠት Team Dashboard ይጠቀሙ።\n' +
-          '• እንደ Manager በሁሉም የ Sales, Store እና Finance ክፍሎች ሙሉ access አለዎት!';
+          'እርስዎ በ *ማናጀር* (ሙሉ ሲስተም access) ውስጥ ነዎት።\n' +
+          '• በ #Orders topic ውስጥ የሚገቡ አዳዲስ ኦርደሮችን ያጽድቁ።\n' +
+          '• የተላኩትን ስሊፖች በማየት ክፍያ ያረጋግጡ።\n' +
+          '• ሰራተኞችን ለማስተዳደርና ሚና ለመስጠት የሰራተኞች ማስተዳደሪያ ይጠቀሙ።\n' +
+          '• እንደ ማናጀር በሁሉም የሴልስ፣ ስቶር እና ፋይናንስ ክፍሎች ሙሉ access አለዎት!';
         keyboardMarkup = Markup.keyboard([
-          ['👥 Manage Team', '💳 Pending Payments'],
+          ['👥 ሰራተኞች አስተዳድር', '💳 ያልተረጋገጡ ክፍያዎች'],
         ]).resize();
         inlineMarkup = Markup.inlineKeyboard([
-          [Markup.button.callback('👥 Team Management Dashboard', 'team_dashboard')],
-          [Markup.button.callback('💳 Audit Pending Payments', 'list_pending_audit')],
+          [Markup.button.callback('👥 ሰራተኞች አስተዳድር', 'team_dashboard')],
+          [Markup.button.callback('💳 ያልተረጋገጡ ክፍያዎች', 'list_pending_audit')],
         ]);
         break;
 
       case 'store':
         roleDescription =
-          'እርስዎ በ *Store Staff* view ውስጥ ነዎት።\n' +
-          '• Manager ያጸደቃቸው (Approved) order-ኦች በ #Store topic ይደርሳሉ።\n' +
-          '• ዕቃውን ሲያስረክቡ የተፈረመበትን Store Receipt በፎቶ መልእክቱን reply በማድረግ ይላኩ።';
+          'እርስዎ በ *ስቶር* ክፍል ውስጥ ነዎት።\n' +
+          '• ማናጀር ያጸደቃቸው ኦርደሮች በ #Store topic ይደርሳሉ።\n' +
+          '• ዕቃውን ሲያስረክቡ የተፈረመበትን ደረሰኝ በፎቶ መልእክቱን reply በማድረግ ይላኩ።';
         break;
 
       case 'finance':
         roleDescription =
-          'እርስዎ በ *Finance Analyst* view ውስጥ ነዎት።\n' +
-          '• Payment Slip የተላከላቸው order-ኦች በ #Finance topic ይደርሳሉ።\n' +
-          '• የባንክ ሂሳቡን በማረጋገጥ *Confirm Paid* ወይም *Flag Discrepancy* ይጫኑ።\n' +
-          '• የተላኩትን ክፍያዎች ለማየት ከታች ያለውን button ወይም /pending_payments ይጠቀሙ።';
+          'እርስዎ በ *ፋይናንስ* ክፍል ውስጥ ነዎት።\n' +
+          '• ስሊፕ የተላከላቸው ኦርደሮች በ #Finance topic ይደርሳሉ።\n' +
+          '• የባንክ ሂሳቡን በማረጋገጥ ክፍያ ያረጋግጡ ወይም ችግር ካለ ሪፖርት ያድርጉ።\n' +
+          '• ያልተረጋገጡ ክፍያዎችን ለማየት ከታች ያለውን አዝራር ወይም /pending_payments ይጠቀሙ።';
         keyboardMarkup = Markup.keyboard([
-          ['💳 Pending Payments'],
+          ['💳 ያልተረጋገጡ ክፍያዎች'],
         ]).resize();
         inlineMarkup = Markup.inlineKeyboard([
-          [Markup.button.callback('💳 Audit Pending Payments', 'list_pending_audit')],
+          [Markup.button.callback('💳 ያልተረጋገጡ ክፍያዎች', 'list_pending_audit')],
         ]);
         break;
     }
@@ -88,12 +95,6 @@ export function registerStartHandlers(bot: Telegraf): void {
 
     let switchButtons: any[] = [];
     if (availableRoles.length > 1) {
-      const roleLabels: Record<UserRole, string> = {
-        manager: '👔 Manager',
-        sales: '💼 Sales',
-        store: '📦 Store',
-        finance: '💳 Finance',
-      };
       switchButtons = availableRoles.map((r) => {
         const isCurrent = r === user.activeRole;
         return Markup.button.callback(
@@ -104,15 +105,15 @@ export function registerStartHandlers(bot: Telegraf): void {
     }
 
     const assignedText = availableRoles.length > 1
-      ? `\n> 🔑 *የተሰጡዎት Roles:* ${user.roles.map((r) => r.toUpperCase()).join(', ')}`
+      ? `\n> 🔑 *የተሰጡዎት ሚናዎች:* ${user.roles.map((r) => roleLabels[r] || r).join(', ')}`
       : '';
 
     const greeting =
       `👋 *እንኳን ደህና መጡ, ${user.cleanName}!*\n\n` +
-      `> 🎯 *Active View:* *${user.activeRole.toUpperCase()}*` +
+      `> 🎯 *የአሁን ሚና:* *${roleLabels[user.activeRole] || user.activeRole}*` +
       assignedText +
       `\n\n${roleDescription}\n\n` +
-      `💡 _መመሪያዎችን ለማየት /help ወይም የጀመሩትን Action ለማቋረጥ /cancel ይጠቀሙ።_`;
+      `💡 _መመሪያዎችን ለማየት /help ወይም የጀመሩትን ለማቋረጥ /cancel ይጠቀሙ።_`;
 
     // Combine inline buttons
     const inlineRows: any[] = [];
@@ -135,8 +136,8 @@ export function registerStartHandlers(bot: Telegraf): void {
       });
       await ctx.reply(
         availableRoles.length > 1
-          ? '🔄 *የ Role ምርጫ / Actions:*'
-          : '👉 *Actions:*',
+          ? '🔄 *የሚና ምርጫ:*'
+          : '👉 *ተግባራት:*',
         {
           parse_mode: 'Markdown',
           ...finalInlineMarkup,
@@ -165,33 +166,33 @@ export function registerStartHandlers(bot: Telegraf): void {
     if (!user) return;
 
     let helpText =
-      `📖 *የሲስተም መመሪያዎች (Help & Instructions)*\n\n` +
+      `📖 *የሲስተም መመሪያዎች (መመሪያ)*\n\n` +
       `> 👤 *ስም:* ${user.name}\n` +
-      `> 🔑 *Active Role:* ${user.role.toUpperCase()}\n\n`;
+      `> 🔑 *የአሁን ሚና:* ${roleLabels[user.role] || user.role}\n\n`;
 
     if (user.role === 'sales') {
       helpText +=
-        `*የ Sales ትእዛዞች (በ Bot የግል ቻት ብቻ):*\n` +
-        `• /new_order — አዲስ የደንበኛ order መመዝገብ\n` +
-        `• /my_orders — የእርስዎን order-ኦች ማየትና Payment Slip መላክ\n` +
-        `• /cancel — የጀመሩትን order ወይም slip መላኪያ ማቋረጥ\n`;
+        `*የሴልስ ትእዛዞች (በ Bot የግል ቻት ብቻ):*\n` +
+        `• /new_order — አዲስ የደንበኛ ኦርደር መመዝገብ\n` +
+        `• /my_orders — የእርስዎን ኦርደሮች ማየትና ስሊፕ መላክ\n` +
+        `• /cancel — የጀመሩትን ኦርደር ወይም ስሊፕ መላኪያ ማቋረጥ\n`;
     } else if (user.role === 'manager') {
       helpText +=
-        `*የ Manager ስራዎች:*\n` +
-        `• በ #Orders topic ውስጥ የሚገቡ አዳዲስ order-ኦችን *Approve* ወይም *Reject* ማድረግ\n` +
-        `• /manage_team ወይም '👥 Manage Team' በመጫን ሰራተኞችን ማስተዳደርና role መስጠት\n` +
-        `• /pending_payments በመጠቀም ያልተረጋገጡ የባንክ ክፍያዎችን audit ማድረግ\n`;
+        `*የማናጀር ስራዎች:*\n` +
+        `• በ #Orders topic ውስጥ የሚገቡ አዳዲስ ኦርደሮችን ማጽደቅ ወይም ውድቅ ማድረግ\n` +
+        `• /manage_team ወይም '👥 ሰራተኞች አስተዳድር' በመጫን ሰራተኞችን ማስተዳደርና ሚና መስጠት\n` +
+        `• /pending_payments በመጠቀም ያልተረጋገጡ የባንክ ክፍያዎችን ማረጋገጥ\n`;
     } else if (user.role === 'store') {
       helpText +=
-        `*የ Store ስራዎች:*\n` +
-        `• በ #Store topic የተፈቀዱ order-ኦችን መከታተል\n` +
-        `• ዕቃው ሲወጣ የተፈረመበትን Store Receipt ፎቶ መልእክቱን reply በማድረግ መላክ\n` +
-        `• bot-ቱ ደረሰኙን ወዲያውኑ ለ Sales Rep በግል ይልካል\n`;
+        `*የስቶር ስራዎች:*\n` +
+        `• በ #Store topic የተፈቀዱ ኦርደሮችን መከታተል\n` +
+        `• ዕቃው ሲወጣ የተፈረመበትን ደረሰኝ ፎቶ መልእክቱን reply በማድረግ መላክ\n` +
+        `• bot-ቱ ደረሰኙን ወዲያውኑ ለሴልስ ሬፕ በግል ይልካል\n`;
     } else if (user.role === 'finance') {
       helpText +=
-        `*የ Finance ስራዎች:*\n` +
-        `• በ #Finance topic የሚገቡ የባንክ Payment Slip-ኦችን መከታተል\n` +
-        `• የባንክ ሂሳቡን በማረጋገጥ *Confirm Paid* ወይም *Flag Discrepancy* መጫን\n` +
+        `*የፋይናንስ ስራዎች:*\n` +
+        `• በ #Finance topic የሚገቡ የባንክ ስሊፖችን መከታተል\n` +
+        `• የባንክ ሂሳቡን በማረጋገጥ ክፍያ ማረጋገጥ ወይም ችግር ካለ ሪፖርት ማድረግ\n` +
         `• /pending_payments በማለት የሚጠብቁ ክፍያዎችን ማየት\n`;
     }
 
@@ -203,6 +204,6 @@ export function registerStartHandlers(bot: Telegraf): void {
     if (ctx.from?.id) {
       clearSession(ctx.from.id);
     }
-    await ctx.reply('🔄 የተጀመረው Action ተሰርዟል። ወደ ዋናው Menu ተመልሰዋል።');
+    await ctx.reply('🔄 የተጀመረው ተግባር ተሰርዟል። ወደ ዋናው ገጽ ተመልሰዋል።');
   });
 }
